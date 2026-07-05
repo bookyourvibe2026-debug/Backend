@@ -21,6 +21,15 @@ function isAllowedOrigin(origin: string): boolean {
   return getAllowedOrigins().includes(origin);
 }
 
+function getPath(req: IncomingMessage): string {
+  return req.url ?? "/";
+}
+
+function shouldConnectDatabase(req: IncomingMessage): boolean {
+  if (req.method === "OPTIONS") return false;
+  return getPath(req) !== "/health";
+}
+
 async function getApp(): Promise<(req: IncomingMessage, res: ServerResponse) => void> {
   if (!appPromise) {
     appPromise = import("../src/app").then(({ createApp }) => createApp() as unknown as (req: IncomingMessage, res: ServerResponse) => void);
@@ -28,28 +37,51 @@ async function getApp(): Promise<(req: IncomingMessage, res: ServerResponse) => 
   return appPromise;
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
+  if (res.headersSent) return;
+  res.statusCode = statusCode;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(payload));
+}
 
-  if (req.method === "OPTIONS") {
-    if (origin && isAllowedOrigin(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      res.setHeader("Vary", "Origin");
-      res.statusCode = 204;
-      res.end();
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+
+    if (req.method === "OPTIONS") {
+      if (origin && isAllowedOrigin(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("Vary", "Origin");
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+
+      res.statusCode = 403;
+      res.end("Not allowed by CORS");
       return;
     }
 
-    res.statusCode = 403;
-    res.end("Not allowed by CORS");
-    return;
+    if (shouldConnectDatabase(req)) {
+      await ensureDatabaseConnection();
+    }
+
+    const app = await getApp();
+    await new Promise<void>((resolve, reject) => {
+      const onDone = () => resolve();
+      res.once("finish", onDone);
+      res.once("close", onDone);
+      try {
+        app(req, res);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected server error";
+    sendJson(res, 500, { success: false, message });
   }
-
-  await ensureDatabaseConnection();
-
-  const app = await getApp();
-  app(req, res);
 }
