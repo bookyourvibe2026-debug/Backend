@@ -1,0 +1,79 @@
+import { Schema, model, Types } from "mongoose";
+
+export type VendorBusinessType = "Company" | "Individual / Proprietor" | "Partnership";
+export type VendorBankAccountType = "Savings" | "Current";
+
+export interface VendorDocument {
+  _id: Types.ObjectId;
+  ownerName: string;
+  businessName: string;
+  email: string;
+  phone: string;
+  passwordHash: string;
+  state: string;
+  city?: string;
+  status: "pending" | "approved" | "suspended";
+  approvedOn?: Date | null;
+  notifications: {
+    email: boolean;
+    whatsapp: boolean;
+    offline: boolean;
+  };
+  logo?: string;
+  businessType?: VendorBusinessType;
+  gstNumber?: string;
+  categories: string[];
+  address: {
+    street?: string;
+    pinCode?: string;
+    country?: string;
+  };
+  bankDetails: {
+    accountNumber?: string;
+    ifsc?: string;
+    bankName?: string;
+    accountType?: VendorBankAccountType;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const vendorSchema = new Schema<VendorDocument>(
+  {
+    ownerName: { type: String, required: true, trim: true, maxlength: 120 },
+    businessName: { type: String, required: true, trim: true, maxlength: 160 },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    phone: { type: String, required: true, unique: true, trim: true },
+    passwordHash: { type: String, required: true, select: false },
+    state: { type: String, required: true },
+    city: { type: String },
+    status: { type: String, enum: ["pending", "approved", "suspended"], default: "pending" },
+    approvedOn: { type: Date, default: null },
+    notifications: {
+      email: { type: Boolean, default: true },
+      whatsapp: { type: Boolean, default: true },
+      offline: { type: Boolean, default: false },
+    },
+    logo: { type: String },
+    businessType: { type: String, enum: ["Company", "Individual / Proprietor", "Partnership"] },
+    gstNumber: { type: String, trim: true },
+    categories: { type: [String], default: [] },
+    address: {
+      street: { type: String },
+      pinCode: { type: String },
+      country: { type: String, default: "India" },
+    },
+    bankDetails: {
+      type: {
+        accountNumber: { type: String },
+        ifsc: { type: String },
+        bankName: { type: String },
+        accountType: { type: String, enum: ["Savings", "Current"] },
+      },
+      default: {},
+    },
+  },
+  { timestamps: true }
+);
+
+export const VendorModel = model<VendorDocument>("Vendor", vendorSchema);
