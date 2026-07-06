@@ -19,7 +19,7 @@ function getCookieDomain(): string | undefined {
   if (env.isProduction && (domain === "localhost" || domain === "127.0.0.1")) {
     return undefined;
   }
-
+   
   return domain;
 }
 
