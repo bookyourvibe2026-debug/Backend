@@ -6,6 +6,7 @@ import adminRoutes from "../modules/admin/admin.routes";
 import appearanceRoutes from "../modules/appearance/appearance.routes";
 import blogRoutes from "../modules/blog/blog.routes";
 import customerBookingsRoutes from "../modules/bookings/customer.bookings.routes";
+import foodRoutes from "../modules/foodOrders/food.routes";
 import vendorRoutes from "../modules/vendor/vendor.routes";
 import venuesRoutes from "../modules/venues/venues.routes";
 
@@ -23,6 +24,7 @@ router.use("/venues", venuesRoutes);
 router.use("/site-appearance", appearanceRoutes);
 router.use("/blog", blogRoutes);
 router.use("/bookings", customerBookingsRoutes);
+router.use("/food", foodRoutes);
 
 router.use("/vendor", vendorRoutes);
 router.use("/admin", adminRoutes);

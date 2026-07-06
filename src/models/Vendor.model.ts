@@ -2,6 +2,8 @@ import { Schema, model, Types } from "mongoose";
 
 export type VendorBusinessType = "Company" | "Individual / Proprietor" | "Partnership";
 export type VendorBankAccountType = "Savings" | "Current";
+/** Which side(s) of the platform this vendor operates — drives which tab-bar/permissions they get. Not to be confused with VendorBusinessType (legal entity type). */
+export type VendorVertical = "turf" | "food" | "both";
 
 export interface VendorDocument {
   _id: Types.ObjectId;
@@ -12,6 +14,7 @@ export interface VendorDocument {
   passwordHash: string;
   state: string;
   city?: string;
+  vertical: VendorVertical;
   status: "pending" | "approved" | "suspended";
   approvedOn?: Date | null;
   notifications: {
@@ -47,6 +50,7 @@ const vendorSchema = new Schema<VendorDocument>(
     passwordHash: { type: String, required: true, select: false },
     state: { type: String, required: true },
     city: { type: String },
+    vertical: { type: String, enum: ["turf", "food", "both"], default: "turf" },
     status: { type: String, enum: ["pending", "approved", "suspended"], default: "pending" },
     approvedOn: { type: Date, default: null },
     notifications: {

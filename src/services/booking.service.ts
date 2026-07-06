@@ -1,16 +1,10 @@
-import { randomBytes } from "crypto";
 import { FilterQuery } from "mongoose";
 import { env } from "../config/env";
 import { BookingDocument, BookingModel } from "../models/Booking.model";
 import { ListingModel } from "../models/Listing.model";
 import { ApiError } from "../utils/ApiError";
+import { generateOrderId } from "../utils/orderId";
 import { paymentProvider } from "./payment/payment.service";
-
-function generateOrderId(): string {
-  const stamp = Date.now().toString(36).toUpperCase();
-  const random = randomBytes(3).toString("hex").toUpperCase();
-  return `BYV-${stamp}-${random}`;
-}
 
 interface PricingResult {
   totalAmount: number;

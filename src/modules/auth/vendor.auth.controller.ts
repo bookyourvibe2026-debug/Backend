@@ -19,7 +19,7 @@ import { getRefreshCookieName } from "../../utils/cookies";
 const AUDIENCE = "vendor" as const;
 
 export const registerVendor = asyncHandler(async (req: Request, res: Response) => {
-  const { ownerName, businessName, email, phone, state, city, password } = req.body;
+  const { ownerName, businessName, email, phone, state, city, password, vertical } = req.body;
 
   const existing = await VendorModel.findOne({ $or: [{ email }, { phone }] });
   if (existing) {
@@ -35,6 +35,7 @@ export const registerVendor = asyncHandler(async (req: Request, res: Response) =
     state,
     city,
     passwordHash,
+    vertical,
     status: "pending",
   });
 
@@ -58,6 +59,7 @@ export const registerVendor = asyncHandler(async (req: Request, res: Response) =
         businessName: vendor.businessName,
         email: vendor.email,
         status: vendor.status,
+        vertical: vendor.vertical,
         role: "vendor",
       },
     },
@@ -94,6 +96,7 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
         businessName: vendor.businessName,
         email: vendor.email,
         status: vendor.status,
+        vertical: vendor.vertical,
         role: "vendor",
       },
     }, "Logged in");
@@ -118,6 +121,8 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
   });
   attachAuthCookies(res, AUDIENCE, pair.refreshToken);
 
+  const parentVendor = await VendorModel.findById(staff.vendorId).select("vertical");
+
   sendSuccess(res, 200, {
     accessToken: pair.accessToken,
     vendor: {
@@ -127,6 +132,8 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
       roleName: staff.roleName,
       email: staff.holderEmail,
       role: staff.accountType,
+      vertical: parentVendor?.vertical ?? "turf",
+      permissions: staff.permissions,
     },
   }, "Logged in");
 });
@@ -200,6 +207,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
       businessName: vendor.businessName,
       email: vendor.email,
       status: vendor.status,
+      vertical: vendor.vertical,
       role: "vendor",
     });
     return;
@@ -207,6 +215,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
 
   const staff = await VendorStaffModel.findById(req.auth?.sub);
   if (!staff) throw ApiError.notFound("Account not found");
+  const parentVendor = await VendorModel.findById(staff.vendorId).select("vertical");
   sendSuccess(res, 200, {
     id: staff._id,
     vendorId: staff.vendorId,
@@ -214,6 +223,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
     roleName: staff.roleName,
     email: staff.holderEmail,
     role: staff.accountType,
+    vertical: parentVendor?.vertical ?? "turf",
     permissions: staff.permissions,
   });
 });

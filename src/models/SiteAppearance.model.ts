@@ -9,6 +9,7 @@ export const THEME_IDS = [
   "royal-purple",
   "fire-red",
   "gold-luxury",
+  "custom",
 ] as const;
 
 export type SiteThemeId = (typeof THEME_IDS)[number];
@@ -21,6 +22,9 @@ export interface SiteAppearanceDocument {
   _id: Types.ObjectId;
   key: typeof SITE_APPEARANCE_KEY;
   theme: SiteThemeId;
+  /** Only set (and only meaningful) when theme === "custom" — a hand-picked brand/accent hex pair. */
+  customBrand?: string;
+  customAccent?: string;
   updatedAt: Date;
 }
 
@@ -28,6 +32,8 @@ const siteAppearanceSchema = new Schema<SiteAppearanceDocument>(
   {
     key: { type: String, required: true, unique: true, default: SITE_APPEARANCE_KEY },
     theme: { type: String, enum: THEME_IDS, required: true, default: DEFAULT_SITE_THEME },
+    customBrand: { type: String },
+    customAccent: { type: String },
   },
   { timestamps: { createdAt: false, updatedAt: true } }
 );

@@ -1,6 +1,15 @@
 import { Schema, model, Types } from "mongoose";
 
-export type ModulePermissionKey = "dashboard" | "bookings" | "listings" | "earnings" | "verification" | "settings" | "membership";
+export type ModulePermissionKey =
+  | "dashboard"
+  | "bookings"
+  | "listings"
+  | "earnings"
+  | "verification"
+  | "settings"
+  | "membership"
+  | "menu"
+  | "foodOrders";
 
 export interface RoleModulePermissions {
   view: boolean;
@@ -51,6 +60,8 @@ const vendorStaffSchema = new Schema<VendorStaffDocument>(
       verification: permissionShape,
       settings: permissionShape,
       membership: permissionShape,
+      menu: permissionShape,
+      foodOrders: permissionShape,
     },
   },
   { timestamps: true }

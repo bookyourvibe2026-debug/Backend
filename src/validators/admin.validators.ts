@@ -134,6 +134,10 @@ export const appVersionUpsertSchema = z.object({
   forceUpdate: z.boolean().optional(),
 });
 
+const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Enter a valid hex color, e.g. #f97316");
+
 export const siteAppearanceUpdateSchema = z.object({
   theme: z.enum(THEME_IDS),
+  customBrand: hexColor.optional(),
+  customAccent: hexColor.optional(),
 });

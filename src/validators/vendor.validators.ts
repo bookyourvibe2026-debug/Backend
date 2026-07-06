@@ -15,6 +15,8 @@ const permissionsMapSchema = z.object({
   verification: permissionSchema,
   settings: permissionSchema,
   membership: permissionSchema,
+  menu: permissionSchema,
+  foodOrders: permissionSchema,
 });
 
 const passwordSchema = z
@@ -106,6 +108,30 @@ export const updateMembershipSchema = z.object({
 });
 
 export const membershipIdParamSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id"),
+});
+
+export const createMenuItemSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(500).optional(),
+  price: z.coerce.number().min(0),
+  category: z.string().trim().max(60).optional(),
+  photo: z.string().url().optional(),
+  inStock: z.boolean().optional(),
+  prepTimeMins: z.coerce.number().int().min(0).optional(),
+});
+
+export const updateMenuItemSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  description: z.string().trim().max(500).optional(),
+  price: z.coerce.number().min(0).optional(),
+  category: z.string().trim().max(60).optional(),
+  photo: z.string().url().optional(),
+  inStock: z.boolean().optional(),
+  prepTimeMins: z.coerce.number().int().min(0).optional(),
+});
+
+export const menuItemIdParamSchema = z.object({
   id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id"),
 });
 
