@@ -29,7 +29,7 @@ export function createApp(): Express {
     credentials: true,
   };
 
-  app.use(helmet());
+  app.use(helmet({ hsts: env.isProduction }));
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
   app.use(pinoHttp({ logger, autoLogging: !env.isTest }));

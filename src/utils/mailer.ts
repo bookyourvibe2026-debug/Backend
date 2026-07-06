@@ -19,13 +19,24 @@ function getTransporter(): Transporter {
   return transporter;
 }
 
+const TRANSIENT_ERROR_CODES = new Set(["ESOCKET", "ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
+
 export async function sendMail(input: { to: string; subject: string; html: string }): Promise<void> {
-  await getTransporter().sendMail({
+  const message = {
     from: env.MAIL_FROM,
     to: input.to,
     subject: input.subject,
     html: input.html,
-  });
+  };
+
+  try {
+    await getTransporter().sendMail(message);
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (!code || !TRANSIENT_ERROR_CODES.has(code)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    await getTransporter().sendMail(message);
+  }
 }
 
 export function otpEmailHtml(code: string, purposeLabel: string): string {
