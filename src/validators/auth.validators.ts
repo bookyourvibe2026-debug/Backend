@@ -25,6 +25,36 @@ export const customerLoginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const customerGoogleAuthSchema = z.object({
+  idToken: z.string().min(1, "Missing Google credential"),
+});
+
+const emailSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+const emailOtpVerifySchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  otp: z.string().trim().length(6, "Enter the 6-digit code"),
+});
+
+export const requestEmailOtpSchema = emailSchema;
+export const emailOtpLoginSchema = emailOtpVerifySchema;
+export const emailOtpVerifyOnlySchema = emailOtpVerifySchema;
+
+export const forgotPasswordSchema = emailSchema;
+
+export const resetPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  otp: z.string().trim().length(6, "Enter the 6-digit code"),
+  newPassword: passwordSchema,
+});
+
+export const updateCustomerProfileSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  avatarUrl: z.string().url().optional(),
+});
+
 export const vendorRegisterSchema = z.object({
   ownerName: z.string().trim().min(2).max(120),
   businessName: z.string().trim().min(2).max(160),

@@ -29,6 +29,17 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+
+  GOOGLE_CLIENT_ID: z.string().optional(),
+
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default("Book Your Vibe <no-reply@bookyourvibe.in>"),
+
+  OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -48,4 +59,6 @@ export const env = {
   isTest: data.NODE_ENV === "test",
   corsOrigins: data.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
   isCloudinaryConfigured: !!(data.CLOUDINARY_CLOUD_NAME && data.CLOUDINARY_API_KEY && data.CLOUDINARY_API_SECRET),
+  isGoogleAuthConfigured: !!data.GOOGLE_CLIENT_ID,
+  isMailerConfigured: !!(data.SMTP_HOST && data.SMTP_USER && data.SMTP_PASS),
 };

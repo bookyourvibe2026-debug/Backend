@@ -4,8 +4,10 @@ export interface CustomerDocument {
   _id: Types.ObjectId;
   name: string;
   email: string;
-  phone: string;
-  passwordHash: string;
+  phone?: string;
+  passwordHash?: string;
+  googleId?: string;
+  avatarUrl?: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   status: "active" | "blocked";
@@ -17,8 +19,10 @@ const customerSchema = new Schema<CustomerDocument>(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, unique: true, trim: true },
-    passwordHash: { type: String, required: true, select: false },
+    phone: { type: String, unique: true, sparse: true, trim: true },
+    passwordHash: { type: String, select: false },
+    googleId: { type: String, unique: true, sparse: true },
+    avatarUrl: { type: String },
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
     status: { type: String, enum: ["active", "blocked"], default: "active" },

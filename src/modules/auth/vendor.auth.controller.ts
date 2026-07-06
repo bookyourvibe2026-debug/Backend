@@ -5,7 +5,15 @@ import { ApiError } from "../../utils/ApiError";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { comparePassword, hashPassword } from "../../utils/password";
-import { attachAuthCookies, clearAuthCookies, issueTokenPair, revokeRefreshToken, rotateRefreshToken } from "../../services/token.service";
+import {
+  attachAuthCookies,
+  clearAuthCookies,
+  issueTokenPair,
+  revokeAllSessions,
+  revokeRefreshToken,
+  rotateRefreshToken,
+} from "../../services/token.service";
+import { requestOtp, verifyOtp } from "../../services/otp.service";
 import { getRefreshCookieName } from "../../utils/cookies";
 
 const AUDIENCE = "vendor" as const;
@@ -121,6 +129,45 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
       role: staff.accountType,
     },
   }, "Logged in");
+});
+
+export const requestVendorRegisterOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  const existing = await VendorModel.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    throw ApiError.conflict("A vendor account with this email already exists");
+  }
+  await requestOtp(email, "vendor_register");
+  sendSuccess(res, 200, null, "Verification code sent to your email");
+});
+
+export const verifyVendorRegisterOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp } = req.body;
+  await verifyOtp(email, "vendor_register", otp);
+  sendSuccess(res, 200, null, "Email verified");
+});
+
+export const forgotVendorPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  const vendor = await VendorModel.findOne({ email: email.toLowerCase() });
+  if (vendor) {
+    await requestOtp(email, "vendor_reset");
+  }
+  sendSuccess(res, 200, null, "If that email is registered, a reset code has been sent.");
+});
+
+export const resetVendorPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body;
+  await verifyOtp(email, "vendor_reset", otp);
+
+  const vendor = await VendorModel.findOne({ email: email.toLowerCase() });
+  if (!vendor) throw ApiError.notFound("Account not found");
+
+  vendor.passwordHash = await hashPassword(newPassword);
+  await vendor.save();
+  await revokeAllSessions(vendor._id.toString(), AUDIENCE);
+
+  sendSuccess(res, 200, null, "Password reset. Please log in with your new password.");
 });
 
 export const refreshVendor = asyncHandler(async (req: Request, res: Response) => {
