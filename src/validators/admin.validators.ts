@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { THEME_IDS } from "../models/SiteAppearance.model";
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const passwordSchema = z
@@ -131,4 +132,8 @@ export const appVersionUpsertSchema = z.object({
   downloadUrl: z.string().url(),
   releaseNotes: z.string().optional(),
   forceUpdate: z.boolean().optional(),
+});
+
+export const siteAppearanceUpdateSchema = z.object({
+  theme: z.enum(THEME_IDS),
 });

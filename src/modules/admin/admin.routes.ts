@@ -3,6 +3,7 @@ import { requireAuth } from "../../middleware/auth.middleware";
 import adminListingsRoutes from "../listings/admin.listings.routes";
 import adminBookingsRoutes from "../bookings/admin.bookings.routes";
 import adminAppVersionRoutes from "./admin.appversion.routes";
+import adminAppearanceRoutes from "./admin.appearance.routes";
 import adminBlogRoutes from "./admin.blog.routes";
 import adminDashboardRoutes from "./admin.dashboard.routes";
 import adminPayoutsRoutes from "./admin.payouts.routes";
@@ -22,6 +23,7 @@ router.use("/bookings", adminBookingsRoutes);
 router.use("/payouts", adminPayoutsRoutes);
 router.use("/blog", adminBlogRoutes);
 router.use("/app-version", adminAppVersionRoutes);
+router.use("/appearance", adminAppearanceRoutes);
 router.use("/uploads", uploadsRoutes);
 
 export default router;

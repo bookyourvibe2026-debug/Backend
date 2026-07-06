@@ -3,6 +3,7 @@ import adminAuthRoutes from "../modules/auth/admin.auth.routes";
 import customerAuthRoutes from "../modules/auth/customer.auth.routes";
 import vendorAuthRoutes from "../modules/auth/vendor.auth.routes";
 import adminRoutes from "../modules/admin/admin.routes";
+import appearanceRoutes from "../modules/appearance/appearance.routes";
 import blogRoutes from "../modules/blog/blog.routes";
 import customerBookingsRoutes from "../modules/bookings/customer.bookings.routes";
 import vendorRoutes from "../modules/vendor/vendor.routes";
@@ -19,6 +20,7 @@ router.use("/auth/vendor", vendorAuthRoutes);
 router.use("/auth/admin", adminAuthRoutes);
 
 router.use("/venues", venuesRoutes);
+router.use("/site-appearance", appearanceRoutes);
 router.use("/blog", blogRoutes);
 router.use("/bookings", customerBookingsRoutes);
 
