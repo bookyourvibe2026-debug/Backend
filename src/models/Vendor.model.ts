@@ -23,6 +23,8 @@ export interface VendorDocument {
     offline: boolean;
   };
   logo?: string;
+  banner?: string;
+  poster?: string;
   businessType?: VendorBusinessType;
   gstNumber?: string;
   categories: string[];
@@ -59,6 +61,8 @@ const vendorSchema = new Schema<VendorDocument>(
       offline: { type: Boolean, default: false },
     },
     logo: { type: String },
+    banner: { type: String },
+    poster: { type: String },
     businessType: { type: String, enum: ["Company", "Individual / Proprietor", "Partnership"] },
     gstNumber: { type: String, trim: true },
     categories: { type: [String], default: [] },

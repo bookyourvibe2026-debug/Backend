@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "seed": "tsx src/seed/seed.ts",
-    "seed:listing": "tsx src/seed/seedSampleListing.ts"
+    "seed:listing": "tsx src/seed/seedSampleListing.ts",
+    "seed:foodMenu": "tsx src/seed/seedFoodMenu.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

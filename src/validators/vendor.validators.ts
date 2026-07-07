@@ -69,6 +69,8 @@ export const updateVendorProfileSchema = z.object({
     })
     .optional(),
   logo: z.string().url().optional(),
+  banner: z.string().url().optional(),
+  poster: z.string().url().optional(),
   businessType: z.enum(["Company", "Individual / Proprietor", "Partnership"]).optional(),
   gstNumber: z.string().trim().max(20).optional(),
   categories: z.array(z.string().trim()).max(5).optional(),
