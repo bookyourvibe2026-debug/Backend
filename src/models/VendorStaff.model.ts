@@ -9,7 +9,9 @@ export type ModulePermissionKey =
   | "settings"
   | "membership"
   | "menu"
-  | "foodOrders";
+  | "foodOrders"
+  | "coaches"
+  | "tournaments";
 
 export interface RoleModulePermissions {
   view: boolean;
@@ -62,6 +64,8 @@ const vendorStaffSchema = new Schema<VendorStaffDocument>(
       membership: permissionShape,
       menu: permissionShape,
       foodOrders: permissionShape,
+      coaches: permissionShape,
+      tournaments: permissionShape,
     },
   },
   { timestamps: true }

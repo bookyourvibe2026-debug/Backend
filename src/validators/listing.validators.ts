@@ -13,6 +13,7 @@ export const createListingSchema = z.object({
   category: z.string().min(1),
   subCategory: z.string().optional(),
   price: z.number().nonnegative(),
+  capacity: z.number().int().positive().optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
   trending: z.boolean().optional(),
   isPrivate: z.boolean().optional(),

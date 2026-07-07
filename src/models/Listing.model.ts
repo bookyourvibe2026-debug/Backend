@@ -46,6 +46,8 @@ export interface ListingDocument {
   category: string;
   subCategory?: string;
   price: number;
+  /** Ticket cap for type: "Event" listings — unused for Turf/Game. */
+  capacity?: number;
   status: "Active" | "Inactive";
   trending: boolean;
   isPrivate: boolean;
@@ -97,6 +99,7 @@ const listingSchema = new Schema<ListingDocument>(
     category: { type: String, required: true },
     subCategory: { type: String },
     price: { type: Number, required: true, min: 0 },
+    capacity: { type: Number, min: 1 },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
     trending: { type: Boolean, default: false },
     isPrivate: { type: Boolean, default: false },

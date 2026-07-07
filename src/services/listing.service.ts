@@ -1,5 +1,6 @@
 import { FilterQuery } from "mongoose";
 import { ListingDocument, ListingModel } from "../models/Listing.model";
+import { BookingModel } from "../models/Booking.model";
 import { ApiError } from "../utils/ApiError";
 
 export interface ListingQuery {
@@ -30,6 +31,12 @@ export async function findPublicListings(query: ListingQuery) {
 export async function findPublicListingById(id: string) {
   const listing = await ListingModel.findOne({ _id: id, status: "Active", isPrivate: false });
   if (!listing) throw ApiError.notFound("Listing not found");
+
+  if (listing.type === "Event" && listing.capacity) {
+    const taken = await BookingModel.countDocuments({ listingId: listing._id, status: { $ne: "Cancelled" } });
+    return { ...listing.toObject(), spotsLeft: Math.max(listing.capacity - taken, 0) };
+  }
+
   return listing;
 }
 

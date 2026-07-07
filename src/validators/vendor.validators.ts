@@ -17,6 +17,8 @@ const permissionsMapSchema = z.object({
   membership: permissionSchema,
   menu: permissionSchema,
   foodOrders: permissionSchema,
+  coaches: permissionSchema,
+  tournaments: permissionSchema,
 });
 
 const passwordSchema = z
