@@ -43,6 +43,34 @@ export const createListingSchema = z.object({
   availableFrom: z.coerce.date(),
   availableTill: z.coerce.date(),
   slotsPerDay: z.number().int().positive(),
+  slotsList: z
+    .array(
+      z.object({
+        startTime: z.string(),
+        endTime: z.string(),
+        label: z.string(),
+        price: z.number().nonnegative(),
+      })
+    )
+    .optional(),
+  dailyRoutine: z.boolean().optional(),
+  dateOverrides: z
+    .array(
+      z.object({
+        date: z.string(),
+        isHoliday: z.boolean(),
+        holidayName: z.string(),
+        slots: z.array(
+          z.object({
+            startTime: z.string(),
+            endTime: z.string(),
+            label: z.string(),
+            price: z.number().nonnegative(),
+          })
+        ),
+      })
+    )
+    .optional(),
 });
 
 export const updateListingSchema = createListingSchema.partial();

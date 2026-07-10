@@ -39,6 +39,20 @@ export interface Coupon {
   discountPercent: number;
 }
 
+export interface TurfSlot {
+  startTime: string;
+  endTime: string;
+  label: string;
+  price: number;
+}
+
+export interface DateOverride {
+  date: string;
+  isHoliday: boolean;
+  holidayName: string;
+  slots: TurfSlot[];
+}
+
 export interface ListingDocument {
   _id: Types.ObjectId;
   title: string;
@@ -81,6 +95,9 @@ export interface ListingDocument {
   availableFrom: Date;
   availableTill: Date;
   slotsPerDay: number;
+  slotsList: TurfSlot[];
+  dailyRoutine: boolean;
+  dateOverrides: DateOverride[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +108,26 @@ const itinerarySchema = new Schema<ItineraryStop>({ day: Number, title: String, 
 const priceTierSchema = new Schema<PriceTier>({ id: String, label: String, amount: Number }, { _id: false });
 const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number }, { _id: false });
 const couponSchema = new Schema<Coupon>({ id: String, code: String, discountPercent: Number }, { _id: false });
+
+const turfSlotSchema = new Schema<TurfSlot>(
+  {
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+    label: { type: String, required: true },
+    price: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
+const dateOverrideSchema = new Schema<DateOverride>(
+  {
+    date: { type: String, required: true },
+    isHoliday: { type: Boolean, default: false },
+    holidayName: { type: String, default: "" },
+    slots: { type: [turfSlotSchema], default: [] },
+  },
+  { _id: false }
+);
 
 const listingSchema = new Schema<ListingDocument>(
   {
@@ -133,6 +170,9 @@ const listingSchema = new Schema<ListingDocument>(
     availableFrom: { type: Date, required: true },
     availableTill: { type: Date, required: true },
     slotsPerDay: { type: Number, required: true, min: 1 },
+    slotsList: { type: [turfSlotSchema], default: [] },
+    dailyRoutine: { type: Boolean, default: true },
+    dateOverrides: { type: [dateOverrideSchema], default: [] },
   },
   { timestamps: true }
 );

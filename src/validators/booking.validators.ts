@@ -16,6 +16,7 @@ export const createBookingSchema = z.object({
     .optional(),
   email: z.string().trim().toLowerCase().email().optional(),
   payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
+  durationMinutes: z.coerce.number().int().positive().optional(),
 });
 
 export const orderIdParamSchema = z.object({

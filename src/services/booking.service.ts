@@ -32,6 +32,7 @@ export interface CreateBookingInput {
   email?: string;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   customerId?: string;
+  durationMinutes?: number;
 }
 
 export async function createBooking(input: CreateBookingInput): Promise<BookingDocument> {
@@ -39,7 +40,29 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   if (!listing) throw ApiError.notFound("Listing not found or unavailable");
 
   let baseAmount = listing.price;
-  if (input.priceTierId) {
+  if (listing.type === "Turf") {
+    const bDate = new Date(input.dateTime);
+    const dateStr = bDate.toISOString().slice(0, 10);
+
+    const override = listing.dateOverrides?.find((o) => o.date === dateStr);
+    let slots = listing.slotsList || [];
+    if (override) {
+      if (override.isHoliday) throw ApiError.badRequest(`The venue is closed on the selected date: ${override.holidayName || "Holiday"}`);
+      slots = override.slots || [];
+    }
+
+    let baseHourlyRate = listing.price || 1000;
+    if (slots.length > 0) {
+      let sum = 0;
+      slots.forEach((s) => {
+        sum += s.price;
+      });
+      baseHourlyRate = Math.round(sum / slots.length);
+    }
+
+    const durationMin = input.durationMinutes || 60;
+    baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
+  } else if (input.priceTierId) {
     const tier = listing.priceTiers.find((t) => t.id === input.priceTierId);
     if (!tier) throw ApiError.badRequest("Selected price tier is not valid for this listing");
     baseAmount = tier.amount;
