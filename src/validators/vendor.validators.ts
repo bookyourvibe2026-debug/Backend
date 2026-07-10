@@ -100,6 +100,7 @@ export const createMembershipSchema = z.object({
   price: z.coerce.number().min(0),
   durationDays: z.coerce.number().int().positive().optional(),
   sessionsIncluded: z.coerce.number().int().positive().optional(),
+  turfDimensions: z.string().trim().max(60).optional(),
 });
 
 export const updateMembershipSchema = z.object({
@@ -108,6 +109,7 @@ export const updateMembershipSchema = z.object({
   price: z.coerce.number().min(0).optional(),
   durationDays: z.coerce.number().int().positive().optional(),
   sessionsIncluded: z.coerce.number().int().positive().optional(),
+  turfDimensions: z.string().trim().max(60).optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
 });
 

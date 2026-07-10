@@ -11,6 +11,7 @@ export interface MembershipDocument {
   price: number;
   durationDays?: number;
   sessionsIncluded?: number;
+  turfDimensions?: string;
   status: "Active" | "Inactive";
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +26,7 @@ const membershipSchema = new Schema<MembershipDocument>(
     price: { type: Number, required: true, min: 0 },
     durationDays: { type: Number, min: 1 },
     sessionsIncluded: { type: Number, min: 1 },
+    turfDimensions: { type: String, trim: true, maxlength: 60 },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
   },
   { timestamps: true }
