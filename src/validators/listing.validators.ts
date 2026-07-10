@@ -50,6 +50,7 @@ export const createListingSchema = z.object({
         endTime: z.string(),
         label: z.string(),
         price: z.number().nonnegative(),
+        blocked: z.boolean().optional(),
       })
     )
     .optional(),
@@ -66,6 +67,7 @@ export const createListingSchema = z.object({
             endTime: z.string(),
             label: z.string(),
             price: z.number().nonnegative(),
+            blocked: z.boolean().optional(),
           })
         ),
       })
