@@ -1,12 +1,15 @@
 import { FilterQuery } from "mongoose";
 import { ListingDocument, ListingModel } from "../models/Listing.model";
 import { BookingModel } from "../models/Booking.model";
+import { VendorModel } from "../models/Vendor.model";
 import { ApiError } from "../utils/ApiError";
 
 export interface ListingQuery {
   city?: string;
   category?: string;
+  subCategory?: string;
   type?: string;
+  vendorId?: string;
   search?: string;
   page: number;
   limit: number;
@@ -15,8 +18,10 @@ export interface ListingQuery {
 export async function findPublicListings(query: ListingQuery) {
   const filter: FilterQuery<ListingDocument> = { status: "Active", isPrivate: false };
   if (query.city) filter.city = new RegExp(`^${escapeRegex(query.city)}$`, "i");
-  if (query.category) filter.category = query.category;
+  if (query.category) filter.categories = query.category;
+  if (query.subCategory) filter.subCategories = query.subCategory;
   if (query.type) filter.type = query.type;
+  if (query.vendorId) filter.vendorId = query.vendorId;
   if (query.search) filter.$text = { $search: query.search };
 
   const skip = (query.page - 1) * query.limit;
@@ -38,6 +43,22 @@ export async function findPublicListingById(id: string) {
   }
 
   return listing;
+}
+
+export async function findPublicVendorProfile(vendorId: string) {
+  const vendor = await VendorModel.findOne({ _id: vendorId, status: "approved" }).select(
+    "businessName ownerName logo banner poster city state"
+  );
+  if (!vendor) throw ApiError.notFound("Vendor not found");
+
+  const listings = await ListingModel.find({
+    vendorId,
+    status: "Active",
+    isPrivate: false,
+    type: { $in: ["Turf", "Game"] },
+  }).sort({ trending: -1, createdAt: -1 });
+
+  return { vendor, listings };
 }
 
 export async function createListingForVendor(vendorId: string, ownerName: string | undefined, data: Partial<ListingDocument>) {

@@ -57,8 +57,8 @@ export interface ListingDocument {
   _id: Types.ObjectId;
   title: string;
   type: ListingType;
-  category: string;
-  subCategory?: string;
+  categories: string[];
+  subCategories: string[];
   price: number;
   /** Ticket cap for type: "Event" listings — unused for Turf/Game. */
   capacity?: number;
@@ -133,8 +133,8 @@ const listingSchema = new Schema<ListingDocument>(
   {
     title: { type: String, required: true, trim: true, maxlength: 200 },
     type: { type: String, enum: ["Turf", "Game", "Event"], required: true },
-    category: { type: String, required: true },
-    subCategory: { type: String },
+    categories: { type: [String], default: [], index: true },
+    subCategories: { type: [String], default: [] },
     price: { type: Number, required: true, min: 0 },
     capacity: { type: Number, min: 1 },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },

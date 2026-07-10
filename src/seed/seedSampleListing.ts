@@ -39,8 +39,8 @@ async function seedSampleListing() {
     {
       title: "Box Cricket Arena",
       type: "Turf",
-      category: "Cricket",
-      subCategory: "Box Cricket",
+      categories: ["cricket"],
+      subCategories: ["box-cricket"],
       price: 800,
       status: "Active",
       trending: true,

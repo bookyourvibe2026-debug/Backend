@@ -1,23 +1,30 @@
 import { Request, Response } from "express";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { findPublicListingById, findPublicListings } from "../../services/listing.service";
+import { findPublicListingById, findPublicListings, findPublicVendorProfile } from "../../services/listing.service";
 
 export const browseVenues = asyncHandler(async (req: Request, res: Response) => {
-  const { city, category, type, search, page, limit } = req.query as unknown as {
+  const { city, category, subCategory, type, vendorId, search, page, limit } = req.query as unknown as {
     city?: string;
     category?: string;
+    subCategory?: string;
     type?: string;
+    vendorId?: string;
     search?: string;
     page: number;
     limit: number;
   };
 
-  const result = await findPublicListings({ city, category, type, search, page, limit });
+  const result = await findPublicListings({ city, category, subCategory, type, vendorId, search, page, limit });
   sendSuccess(res, 200, result);
 });
 
 export const getVenueById = asyncHandler(async (req: Request, res: Response) => {
   const listing = await findPublicListingById(req.params.id!);
   sendSuccess(res, 200, listing);
+});
+
+export const getVendorProfile = asyncHandler(async (req: Request, res: Response) => {
+  const profile = await findPublicVendorProfile(req.params.vendorId!);
+  sendSuccess(res, 200, profile);
 });
