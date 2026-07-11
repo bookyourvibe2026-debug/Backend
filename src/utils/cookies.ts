@@ -24,22 +24,30 @@ function getCookieDomain(): string | undefined {
 }
 
 export function setRefreshCookie(res: Response, audience: Audience, token: string, maxAgeMs: number): void {
+  const isProd = env.isProduction;
+  const cookieDomain = getCookieDomain();
+
   res.cookie(refreshCookieName(audience), token, {
     httpOnly: true,
-    secure: env.isProduction,
-    sameSite: env.isProduction ? "none" : "lax",
-    domain: getCookieDomain(),
+    secure: isProd,
+    // Use "lax" in production if a custom domain is configured (subdomain cookie sharing is same-site).
+    // Otherwise fallback to "none" (which may be blocked on mobile without frontend client localStorage).
+    sameSite: isProd ? (cookieDomain ? "lax" : "none") : "lax",
+    domain: cookieDomain,
     path: refreshCookiePath(audience),
     maxAge: maxAgeMs,
   });
 }
 
 export function clearRefreshCookie(res: Response, audience: Audience): void {
+  const isProd = env.isProduction;
+  const cookieDomain = getCookieDomain();
+
   res.clearCookie(refreshCookieName(audience), {
     httpOnly: true,
-    secure: env.isProduction,
-    sameSite: env.isProduction ? "none" : "lax",
-    domain: getCookieDomain(),
+    secure: isProd,
+    sameSite: isProd ? (cookieDomain ? "lax" : "none") : "lax",
+    domain: cookieDomain,
     path: refreshCookiePath(audience),
   });
 }
