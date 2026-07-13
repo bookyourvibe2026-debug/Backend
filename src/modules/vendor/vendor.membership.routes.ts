@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireVendorPermission } from "../../middleware/permissions.middleware";
+import { requireVendorVertical } from "../../middleware/vendorScope.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import {
   createMembershipSchema,
@@ -19,6 +20,8 @@ import {
 } from "./vendor.membership.controller";
 
 const router = Router();
+
+router.use(requireVendorVertical("turf"));
 
 router.get("/", requireVendorPermission("membership", "view"), listMemberships);
 router.post("/", requireVendorPermission("membership", "create"), validate({ body: createMembershipSchema }), createMembership);

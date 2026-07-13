@@ -45,6 +45,7 @@ export interface TurfSlot {
   label: string;
   price: number;
   blocked?: boolean;
+  blockedReason?: string;
 }
 
 export interface DateOverride {
@@ -117,6 +118,7 @@ const turfSlotSchema = new Schema<TurfSlot>(
     label: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
     blocked: { type: Boolean, default: false },
+    blockedReason: { type: String },
   },
   { _id: false }
 );

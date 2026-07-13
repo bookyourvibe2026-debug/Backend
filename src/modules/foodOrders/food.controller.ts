@@ -9,7 +9,7 @@ import { createFoodOrder, getFoodOrderByOrderId, listFoodOrdersForCustomer } fro
 
 export const listFoodVendors = asyncHandler(async (_req: Request, res: Response) => {
   const vendors = await VendorModel.find({
-    vertical: { $in: ["food", "both"] },
+    verticals: "food",
     status: "approved",
   }).select("businessName ownerName logo banner poster city state categories");
   sendSuccess(res, 200, vendors);
@@ -18,7 +18,7 @@ export const listFoodVendors = asyncHandler(async (_req: Request, res: Response)
 export const getFoodVendorMenu = asyncHandler(async (req: Request, res: Response) => {
   const vendor = await VendorModel.findOne({
     _id: req.params.vendorId,
-    vertical: { $in: ["food", "both"] },
+    verticals: "food",
     status: "approved",
   }).select("businessName ownerName logo banner poster city state");
   if (!vendor) throw ApiError.notFound("Food vendor not found");

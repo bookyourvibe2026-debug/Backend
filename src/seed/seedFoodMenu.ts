@@ -87,8 +87,8 @@ async function seedFoodMenu() {
   }
 
   let touched = false;
-  if (vendor.vertical !== "food" && vendor.vertical !== "both") {
-    vendor.vertical = "food";
+  if (!vendor.verticals.includes("food")) {
+    vendor.verticals = [...vendor.verticals, "food"];
     touched = true;
   }
   if (vendor.status !== "approved") {

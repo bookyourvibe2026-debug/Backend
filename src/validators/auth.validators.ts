@@ -63,7 +63,7 @@ export const vendorRegisterSchema = z.object({
   state: z.string().trim().min(2),
   city: z.string().trim().min(2).optional(),
   password: passwordSchema,
-  vertical: z.enum(["turf", "food", "both"]).default("turf"),
+  verticals: z.array(z.enum(["turf", "events", "food", "coaches"])).min(1, "Select at least one role"),
 });
 
 export const vendorLoginSchema = z.object({

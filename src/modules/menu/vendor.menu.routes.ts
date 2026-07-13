@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { requireVendorPermission } from "../../middleware/permissions.middleware";
+import { requireVendorVertical } from "../../middleware/vendorScope.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import { createMenuItemSchema, menuItemIdParamSchema, updateMenuItemSchema } from "../../validators/vendor.validators";
 import { createMenuItem, deleteMenuItem, listMenuItems, updateMenuItem } from "./vendor.menu.controller";
 
 const router = Router();
+
+router.use(requireVendorVertical("food"));
 
 router.get("/", requireVendorPermission("menu", "view"), listMenuItems);
 router.post("/", requireVendorPermission("menu", "create"), validate({ body: createMenuItemSchema }), createMenuItem);

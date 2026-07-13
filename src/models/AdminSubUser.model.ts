@@ -7,6 +7,7 @@ export type AdminModuleKey =
   | "bookings"
   | "payouts"
   | "blog"
+  | "banners"
   | "marketing"
   | "categories"
   | "users"
@@ -54,6 +55,7 @@ const adminSubUserSchema = new Schema<AdminSubUserDocument>(
       bookings: permissionShape,
       payouts: permissionShape,
       blog: permissionShape,
+      banners: permissionShape,
       marketing: permissionShape,
       categories: permissionShape,
       users: permissionShape,

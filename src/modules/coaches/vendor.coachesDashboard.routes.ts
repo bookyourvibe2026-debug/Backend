@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { requireVendorPermission } from "../../middleware/permissions.middleware";
 import { requireVendorVertical } from "../../middleware/vendorScope.middleware";
-import { getVendorFoodDashboard } from "./vendor.foodDashboard.controller";
+import { getVendorCoachesDashboard } from "./vendor.coachesDashboard.controller";
 
 const router = Router();
 
-router.use(requireVendorVertical("food"));
+router.use(requireVendorVertical("coaches"));
 
-router.get("/", requireVendorPermission("dashboard", "view"), getVendorFoodDashboard);
+router.get("/", requireVendorPermission("coaches", "view"), getVendorCoachesDashboard);
 
 export default router;

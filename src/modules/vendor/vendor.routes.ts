@@ -8,6 +8,8 @@ import vendorTournamentsRoutes from "../tournaments/vendor.tournaments.routes";
 import vendorMenuRoutes from "../menu/vendor.menu.routes";
 import vendorFoodOrdersRoutes from "../foodOrders/vendor.foodOrders.routes";
 import vendorFoodDashboardRoutes from "../foodOrders/vendor.foodDashboard.routes";
+import vendorEventsDashboardRoutes from "../tournaments/vendor.eventsDashboard.routes";
+import vendorCoachesDashboardRoutes from "../coaches/vendor.coachesDashboard.routes";
 import vendorDashboardRoutes from "./vendor.dashboard.routes";
 import vendorMembershipRoutes from "./vendor.membership.routes";
 import vendorProfileRoutes from "./vendor.profile.routes";
@@ -29,6 +31,8 @@ router.use("/memberships", vendorMembershipRoutes);
 router.use("/menu", vendorMenuRoutes);
 router.use("/food-orders", vendorFoodOrdersRoutes);
 router.use("/food-dashboard", vendorFoodDashboardRoutes);
+router.use("/events-dashboard", vendorEventsDashboardRoutes);
+router.use("/coaches-dashboard", vendorCoachesDashboardRoutes);
 router.use("/uploads", uploadsRoutes);
 
 export default router;

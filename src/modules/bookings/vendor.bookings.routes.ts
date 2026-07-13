@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requireVendorPermission } from "../../middleware/permissions.middleware";
-import { resolveVendorScope } from "../../middleware/vendorScope.middleware";
+import { resolveVendorScope, requireVendorVertical } from "../../middleware/vendorScope.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import { bookingListQuerySchema, createManualBookingSchema, orderIdParamSchema, updateBookingStatusSchema } from "../../validators/booking.validators";
 import {
@@ -14,7 +14,7 @@ import {
 
 const router = Router();
 
-router.use(requireAuth("vendor"), resolveVendorScope);
+router.use(requireAuth("vendor"), resolveVendorScope, requireVendorVertical("turf"));
 
 router.get("/", requireVendorPermission("bookings", "view"), validate({ query: bookingListQuerySchema }), getVendorBookings);
 router.post("/", requireVendorPermission("bookings", "create"), validate({ body: createManualBookingSchema }), createVendorBooking);

@@ -51,6 +51,7 @@ export const createListingSchema = z.object({
         label: z.string(),
         price: z.number().nonnegative(),
         blocked: z.boolean().optional(),
+        blockedReason: z.string().max(200).optional(),
       })
     )
     .optional(),

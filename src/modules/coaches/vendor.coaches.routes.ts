@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { requireVendorPermission } from "../../middleware/permissions.middleware";
-import { resolveVendorScope } from "../../middleware/vendorScope.middleware";
+import { resolveVendorScope, requireVendorVertical } from "../../middleware/vendorScope.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import {
   addSlotSchema,
@@ -27,7 +27,7 @@ import {
 
 const router = Router();
 
-router.use(requireAuth("vendor"), resolveVendorScope);
+router.use(requireAuth("vendor"), resolveVendorScope, requireVendorVertical("coaches"));
 
 router.get("/", requireVendorPermission("coaches", "view"), validate({ query: vendorCoachQuerySchema }), getVendorCoaches);
 router.post("/", requireVendorPermission("coaches", "create"), validate({ body: createCoachSchema }), createVendorCoach);

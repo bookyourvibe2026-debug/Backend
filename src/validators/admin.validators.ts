@@ -68,6 +68,7 @@ const adminPermissionsMapSchema = z.object({
   bookings: permissionSchema,
   payouts: permissionSchema,
   blog: permissionSchema,
+  banners: permissionSchema,
   marketing: permissionSchema,
   categories: permissionSchema,
   users: permissionSchema,
@@ -104,6 +105,16 @@ export const createBlogPostSchema = z.object({
 });
 
 export const updateBlogPostSchema = createBlogPostSchema.partial();
+
+export const createAdBannerSchema = z.object({
+  imageUrl: z.string().min(1),
+  title: z.string().trim().max(160).optional(),
+  linkUrl: z.string().trim().max(500).optional(),
+  order: z.coerce.number().int().default(0),
+  isActive: z.boolean().default(true),
+});
+
+export const updateAdBannerSchema = createAdBannerSchema.partial();
 
 export const payoutCategorySchema = z.object({
   name: z.string().trim().min(1),

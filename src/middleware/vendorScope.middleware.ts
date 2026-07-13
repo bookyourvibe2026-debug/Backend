@@ -1,5 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiError } from "../utils/ApiError";
+import { VendorModel, VendorVertical } from "../models/Vendor.model";
+import { asyncHandler } from "../utils/asyncHandler";
 
 /**
  * Resolves the vendor business a request acts on: the vendor's own id when logged in as
@@ -18,4 +20,18 @@ export function resolveVendorScope(req: Request, _res: Response, next: NextFunct
     return;
   }
   next();
+}
+
+/**
+ * Gates a feature module (tournaments, coaches, menu, listings, ...) to vendors who
+ * registered for the matching role. Must run after resolveVendorScope so req.vendorId is set.
+ */
+export function requireVendorVertical(vertical: VendorVertical) {
+  return asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
+    const vendor = await VendorModel.findById(req.vendorId).select("verticals").lean();
+    if (!vendor || !vendor.verticals.includes(vertical)) {
+      throw ApiError.forbidden(`This account is not registered as a ${vertical} vendor`);
+    }
+    next();
+  });
 }
