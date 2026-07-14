@@ -76,6 +76,7 @@ export const updateVendorProfileSchema = z.object({
   businessType: z.enum(["Company", "Individual / Proprietor", "Partnership"]).optional(),
   gstNumber: z.string().trim().max(20).optional(),
   categories: z.array(z.string().trim()).max(5).optional(),
+  sports: z.array(z.string().trim()).optional(),
   address: z
     .object({
       street: z.string().trim().max(200).optional(),

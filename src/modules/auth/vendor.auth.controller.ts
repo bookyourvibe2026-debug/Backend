@@ -60,6 +60,7 @@ export const registerVendor = asyncHandler(async (req: Request, res: Response) =
         email: vendor.email,
         status: vendor.status,
         verticals: vendor.verticals,
+        sports: vendor.sports,
         role: "vendor",
       },
     },
@@ -97,6 +98,7 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
         email: vendor.email,
         status: vendor.status,
         verticals: vendor.verticals,
+        sports: vendor.sports,
         role: "vendor",
       },
     }, "Logged in");
@@ -121,7 +123,7 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
   });
   attachAuthCookies(res, AUDIENCE, pair.refreshToken);
 
-  const parentVendor = await VendorModel.findById(staff.vendorId).select("verticals");
+  const parentVendor = await VendorModel.findById(staff.vendorId).select("verticals sports");
 
   sendSuccess(res, 200, {
     accessToken: pair.accessToken,
@@ -133,6 +135,7 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
       email: staff.holderEmail,
       role: staff.accountType,
       verticals: parentVendor?.verticals ?? ["turf"],
+      sports: parentVendor?.sports ?? [],
       permissions: staff.permissions,
     },
   }, "Logged in");
@@ -208,6 +211,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
       email: vendor.email,
       status: vendor.status,
       verticals: vendor.verticals,
+      sports: vendor.sports,
       role: "vendor",
     });
     return;
@@ -215,7 +219,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
 
   const staff = await VendorStaffModel.findById(req.auth?.sub);
   if (!staff) throw ApiError.notFound("Account not found");
-  const parentVendor = await VendorModel.findById(staff.vendorId).select("verticals");
+  const parentVendor = await VendorModel.findById(staff.vendorId).select("verticals sports");
   sendSuccess(res, 200, {
     id: staff._id,
     vendorId: staff.vendorId,
@@ -224,6 +228,7 @@ export const getCurrentVendor = asyncHandler(async (req: Request, res: Response)
     email: staff.holderEmail,
     role: staff.accountType,
     verticals: parentVendor?.verticals ?? ["turf"],
+    sports: parentVendor?.sports ?? [],
     permissions: staff.permissions,
   });
 });

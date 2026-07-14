@@ -28,6 +28,7 @@ export interface VendorDocument {
   businessType?: VendorBusinessType;
   gstNumber?: string;
   categories: string[];
+  sports: string[];
   address: {
     street?: string;
     pinCode?: string;
@@ -39,6 +40,7 @@ export interface VendorDocument {
     bankName?: string;
     accountType?: VendorBankAccountType;
   };
+  mpinHash?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +52,7 @@ const vendorSchema = new Schema<VendorDocument>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     phone: { type: String, required: true, unique: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
+    mpinHash: { type: String, select: false },
     state: { type: String, required: true },
     city: { type: String },
     verticals: {
@@ -74,6 +77,7 @@ const vendorSchema = new Schema<VendorDocument>(
     businessType: { type: String, enum: ["Company", "Individual / Proprietor", "Partnership"] },
     gstNumber: { type: String, trim: true },
     categories: { type: [String], default: [] },
+    sports: { type: [String], default: [] },
     address: {
       street: { type: String },
       pinCode: { type: String },

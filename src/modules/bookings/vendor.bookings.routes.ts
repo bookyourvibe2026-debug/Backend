@@ -10,6 +10,7 @@ import {
   getVendorBookingByOrderId,
   getVendorBookings,
   updateVendorBookingStatus,
+  exportBookingsToExcel,
 } from "./vendor.bookings.controller";
 
 const router = Router();
@@ -17,6 +18,7 @@ const router = Router();
 router.use(requireAuth("vendor"), resolveVendorScope, requireVendorVertical("turf"));
 
 router.get("/", requireVendorPermission("bookings", "view"), validate({ query: bookingListQuerySchema }), getVendorBookings);
+router.get("/export", requireVendorPermission("bookings", "view"), exportBookingsToExcel);
 router.post("/", requireVendorPermission("bookings", "create"), validate({ body: createManualBookingSchema }), createVendorBooking);
 router.get(
   "/:orderId",

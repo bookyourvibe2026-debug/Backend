@@ -11,6 +11,7 @@ const PURPOSE_LABELS: Record<OtpPurpose, string> = {
   customer_reset: "reset your password",
   vendor_reset: "reset your password",
   vendor_register: "verify your email",
+  vendor_mpin_change: "change your MPIN",
 };
 
 export async function requestOtp(email: string, purpose: OtpPurpose): Promise<void> {

@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
 
-export type OtpPurpose = "customer_login" | "customer_reset" | "vendor_reset" | "vendor_register";
+export type OtpPurpose = "customer_login" | "customer_reset" | "vendor_reset" | "vendor_register" | "vendor_mpin_change";
 
 export interface OtpDocument {
   email: string;
@@ -14,7 +14,7 @@ export interface OtpDocument {
 
 const otpSchema = new Schema<OtpDocument>({
   email: { type: String, required: true, lowercase: true, trim: true, index: true },
-  purpose: { type: String, enum: ["customer_login", "customer_reset", "vendor_reset", "vendor_register"], required: true },
+  purpose: { type: String, enum: ["customer_login", "customer_reset", "vendor_reset", "vendor_register", "vendor_mpin_change"], required: true },
   codeHash: { type: String, required: true },
   expiresAt: { type: Date, required: true },
   attempts: { type: Number, default: 0 },

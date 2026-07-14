@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import * as xlsx from "xlsx";
+import { BookingModel } from "../../models/Booking.model";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
@@ -38,4 +40,32 @@ export const updateVendorBookingStatus = asyncHandler(async (req: Request, res: 
 export const checkInVendorBooking = asyncHandler(async (req: Request, res: Response) => {
   const { booking, alreadyCheckedIn } = await checkInBooking(req.params.orderId!, req.vendorId!);
   sendSuccess(res, 200, booking, alreadyCheckedIn ? "Already checked in" : "Checked in");
+});
+
+export const exportBookingsToExcel = asyncHandler(async (req: Request, res: Response) => {
+  const bookings = await BookingModel.find({ vendorId: req.vendorId })
+    .populate("listingId", "title")
+    .sort({ dateTime: -1 })
+    .lean();
+
+  const data = bookings.map((b: any) => ({
+    "Customer Name": b.customerName,
+    "Court": b.listingId?.title || "N/A",
+    "Amount Paid (₹)": b.totalAmount,
+    "Date": new Date(b.dateTime).toLocaleDateString("en-IN"),
+    "Time": new Date(b.dateTime).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' }),
+    "Booking Type": b.payment === "Cash (Offline)" ? "Offline" : "Online",
+    "Status": b.status,
+    "Payment Status": b.paymentStatus
+  }));
+
+  const worksheet = xlsx.utils.json_to_sheet(data);
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(workbook, worksheet, "Bookings");
+
+  const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Disposition", 'attachment; filename="bookings_report.xlsx"');
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.send(buffer);
 });
