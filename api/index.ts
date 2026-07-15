@@ -10,11 +10,21 @@ function ensureDatabaseConnection(): Promise<void> {
   return dbConnection;
 }
 
+/** Hard-coded origins that are ALWAYS allowed (no env-var parsing issues on Vercel). */
+const HARDCODED_ORIGINS = [
+  "http://localhost:3000",
+  "https://bookyourvibe.in",
+  "https://www.bookyourvibe.in",
+  "https://frontend-wedc.vercel.app",
+];
+
 function getAllowedOrigins(): string[] {
-  return (process.env.CORS_ORIGINS ?? "http://localhost:3000")
+  const fromEnv = (process.env.CORS_ORIGINS ?? "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((o) => o.trim())
     .filter(Boolean);
+  // Merge hardcoded + env-var origins (deduplicated)
+  return Array.from(new Set([...HARDCODED_ORIGINS, ...fromEnv]));
 }
 
 function isAllowedOrigin(origin: string): boolean {

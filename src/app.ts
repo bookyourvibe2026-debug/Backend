@@ -16,9 +16,18 @@ export function createApp(): Express {
 
   app.set("trust proxy", 1);
 
+/** Always-allowed origins — hardcoded so Vercel env-var parsing can never break them. */
+const ALLOWED_ORIGINS = Array.from(new Set([
+  "http://localhost:3000",
+  "https://bookyourvibe.in",
+  "https://www.bookyourvibe.in",
+  "https://frontend-wedc.vercel.app",
+  ...env.corsOrigins, // still picks up anything extra from the env var
+]));
+
   const corsOptions = {
     origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-      if (!origin || env.corsOrigins.includes(origin)) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
         return;
       }
