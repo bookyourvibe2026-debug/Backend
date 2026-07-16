@@ -11,6 +11,7 @@ import vendorFoodDashboardRoutes from "../foodOrders/vendor.foodDashboard.routes
 import vendorEventsDashboardRoutes from "../tournaments/vendor.eventsDashboard.routes";
 import vendorCoachesDashboardRoutes from "../coaches/vendor.coachesDashboard.routes";
 import vendorDashboardRoutes from "./vendor.dashboard.routes";
+import vendorExpenseRoutes from "./vendor.expense.routes";
 import vendorMembershipRoutes from "./vendor.membership.routes";
 import vendorProfileRoutes from "./vendor.profile.routes";
 import vendorStaffRoutes from "./vendor.staff.routes";
@@ -22,6 +23,7 @@ const router = Router();
 router.use(requireAuth("vendor"), resolveVendorScope);
 
 router.use("/dashboard", vendorDashboardRoutes);
+router.use("/expenses", vendorExpenseRoutes);
 router.use("/profile", vendorProfileRoutes);
 router.use("/staff", vendorStaffRoutes);
 router.use("/mpin", vendorMpinRoutes);

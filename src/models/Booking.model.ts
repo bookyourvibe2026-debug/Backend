@@ -13,7 +13,10 @@ export interface BookingDocument {
   customerName: string;
   phone: string;
   email?: string;
+  /** Which sport the slot was booked for (vendor-entered on manual bookings). */
+  sport?: string;
   dateTime: Date;
+  endTime?: string;
   totalAmount: number;
   platformFee: number;
   taxes: number;
@@ -40,7 +43,10 @@ const bookingSchema = new Schema<BookingDocument>(
     customerName: { type: String, required: true },
     phone: { type: String, required: true },
     email: { type: String },
+    sport: { type: String },
     dateTime: { type: Date, required: true },
+    /** Slot end as "HH:mm"; optional so existing bookings stay valid. */
+    endTime: { type: String },
     totalAmount: { type: Number, required: true, min: 0 },
     platformFee: { type: Number, required: true, min: 0, default: 0 },
     taxes: { type: Number, required: true, min: 0, default: 0 },

@@ -155,3 +155,23 @@ export const createSubscriptionSchema = z.object({
 export const updateSubscriptionStatusSchema = z.object({
   status: z.enum(["active", "expired", "cancelled"]),
 });
+
+/* ─── Expenses ──────────────────────────────────────────────────── */
+
+export const expenseIdParamSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id"),
+});
+
+export const createExpenseSchema = z.object({
+  category: z.enum(["Maintenance", "Rent", "Salary", "Misc"]),
+  amount: z.coerce.number().min(0),
+  note: z.string().trim().max(200).optional(),
+  spentAt: z.coerce.date().optional(),
+});
+
+export const updateExpenseSchema = createExpenseSchema.partial();
+
+export const expenseQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+});

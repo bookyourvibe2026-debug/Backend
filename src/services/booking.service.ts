@@ -126,7 +126,9 @@ export interface CreateManualBookingInput {
   listingId: string;
   customerName: string;
   phone: string;
+  sport?: string;
   dateTime: Date;
+  endTime?: string;
   totalAmount: number;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   status: BookingDocument["status"];
@@ -145,7 +147,9 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
     vendorId,
     customerName: input.customerName,
     phone: input.phone,
+    sport: input.sport,
     dateTime: input.dateTime,
+    endTime: input.endTime,
     totalAmount: pricing.totalAmount,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
