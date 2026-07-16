@@ -183,4 +183,21 @@ const listingSchema = new Schema<ListingDocument>(
 
 listingSchema.index({ title: "text", description: "text", tags: "text" });
 
+/*
+ * Compound indexes matching the real query shapes (filter fields first, then sort
+ * fields). Without these, the public browse ran a collection scan plus an
+ * in-memory sort, which degrades as the catalogue grows.
+ */
+
+// Public browse: { status, isPrivate, ...optional filters } sorted by { trending, createdAt }.
+listingSchema.index({ status: 1, isPrivate: 1, trending: -1, createdAt: -1 });
+// Public browse narrowed by city (the most common filter), same sort.
+listingSchema.index({ status: 1, isPrivate: 1, city: 1, trending: -1, createdAt: -1 });
+// Public browse narrowed by type, same sort.
+listingSchema.index({ status: 1, isPrivate: 1, type: 1, trending: -1, createdAt: -1 });
+// Public vendor profile: { vendorId, status, isPrivate, type } sorted by { trending, createdAt }.
+listingSchema.index({ vendorId: 1, status: 1, isPrivate: 1, type: 1, trending: -1, createdAt: -1 });
+// Vendor panel listing table: { vendorId } sorted by { createdAt }.
+listingSchema.index({ vendorId: 1, createdAt: -1 });
+
 export const ListingModel = model<ListingDocument>("Listing", listingSchema);
