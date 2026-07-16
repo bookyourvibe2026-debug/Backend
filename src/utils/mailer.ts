@@ -1,5 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import type { ConnectionOptions } from "node:tls";
 import { env } from "../config/env";
+import { logger } from "../config/logger";
 import { ApiError } from "./ApiError";
 
 let transporter: Transporter | null = null;
@@ -14,6 +16,11 @@ function getTransporter(): Transporter {
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+      // Many hosts have broken/filtered outbound IPv6 routes to Gmail's SMTP servers, which
+      // corrupts the TLS handshake ("wrong version number"). Force IPv4 for the raw socket.
+      // `family` is a valid tls.connect()/net.connect() option that the bundled tls types
+      // don't declare, so it's threaded through nodemailer's `tls` passthrough with a cast.
+      tls: { family: 4 } as ConnectionOptions,
     });
   }
   return transporter;
@@ -35,7 +42,12 @@ export async function sendMail(input: { to: string; subject: string; html: strin
     const code = (err as { code?: string }).code;
     if (!code || !TRANSIENT_ERROR_CODES.has(code)) throw err;
     await new Promise((resolve) => setTimeout(resolve, 750));
-    await getTransporter().sendMail(message);
+    try {
+      await getTransporter().sendMail(message);
+    } catch (retryErr) {
+      logger.error({ err: retryErr, to: input.to }, "Failed to send email after retry");
+      throw ApiError.serviceUnavailable("Couldn't send the email right now — please try again in a moment.");
+    }
   }
 }
 
