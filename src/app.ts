@@ -55,4 +55,8 @@ const ALLOWED_ORIGINS = Array.from(new Set([
   return app;
 }
 
-// Trigger restart
+// Safety net for Vercel: if the platform ever loads this module as a serverless
+// entrypoint (it shouldn't — all traffic is rewritten to /api/index), a valid
+// function default export prevents the "default export must be a function or
+// server" crash. Nothing routes here, so it is only ever validated, never invoked.
+export default createApp;
