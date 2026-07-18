@@ -14,7 +14,8 @@ import {
 
 const router = Router();
 
-router.use(requireAuth("vendor"), resolveVendorScope, requireVendorVertical("turf"));
+// Turf vendors manage Turf/Game listings; events organizers manage Event listings here too.
+router.use(requireAuth("vendor"), resolveVendorScope, requireVendorVertical("turf", "events"));
 
 router.get("/", requireVendorPermission("listings", "view"), getVendorListings);
 router.get("/:id", requireVendorPermission("listings", "view"), validate({ params: listingIdParamSchema }), getVendorListingById);

@@ -26,11 +26,12 @@ export function resolveVendorScope(req: Request, _res: Response, next: NextFunct
  * Gates a feature module (tournaments, coaches, menu, listings, ...) to vendors who
  * registered for the matching role. Must run after resolveVendorScope so req.vendorId is set.
  */
-export function requireVendorVertical(vertical: VendorVertical) {
+export function requireVendorVertical(...verticals: VendorVertical[]) {
   return asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
     const vendor = await VendorModel.findById(req.vendorId).select("verticals").lean();
-    if (!vendor || !vendor.verticals.includes(vertical)) {
-      throw ApiError.forbidden(`This account is not registered as a ${vertical} vendor`);
+    const allowed = vendor && verticals.some((v) => vendor.verticals.includes(v));
+    if (!allowed) {
+      throw ApiError.forbidden(`This account is not registered as a ${verticals.join(" or ")} vendor`);
     }
     next();
   });

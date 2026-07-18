@@ -25,9 +25,12 @@ export async function requestOtp(email: string, purpose: OtpPurpose): Promise<vo
     expiresAt: new Date(Date.now() + env.OTP_TTL_MINUTES * 60_000),
   });
 
-  if (!env.isMailerConfigured) {
+  if (env.isDevelopment) {
     // eslint-disable-next-line no-console
     console.log(`\n======================================================\n[DEV ONLY] OTP verification code for ${normalizedEmail} (${purpose}): ${code}\n======================================================\n`);
+  }
+
+  if (!env.isMailerConfigured) {
     return;
   }
 
