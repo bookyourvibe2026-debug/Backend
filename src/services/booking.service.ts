@@ -32,6 +32,7 @@ export interface CreateBookingInput {
   email?: string;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   customerId?: string;
+  sport?: string;
   durationMinutes?: number;
 }
 
@@ -110,6 +111,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     customerName: input.customerName,
     phone: input.phone,
     email: input.email,
+    sport: input.sport,
     dateTime: input.dateTime,
     totalAmount: pricing.totalAmount,
     platformFee: pricing.platformFee,

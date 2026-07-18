@@ -95,6 +95,7 @@ export const updateVendorProfileSchema = z.object({
 });
 
 export const createMembershipSchema = z.object({
+  listingId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id").optional(),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional(),
   planType: z.enum(["duration", "sessions"]),
@@ -105,6 +106,7 @@ export const createMembershipSchema = z.object({
 });
 
 export const updateMembershipSchema = z.object({
+  listingId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id").optional(),
   name: z.string().trim().min(2).max(120).optional(),
   description: z.string().trim().max(500).optional(),
   price: z.coerce.number().min(0).optional(),
