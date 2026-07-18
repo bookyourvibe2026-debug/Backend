@@ -1,4 +1,4 @@
-import { FilterQuery } from "mongoose";
+import { FilterQuery, Types } from "mongoose";
 import { ListingDocument, ListingModel } from "../models/Listing.model";
 import { BookingModel } from "../models/Booking.model";
 import { VendorModel } from "../models/Vendor.model";
@@ -58,7 +58,8 @@ export async function findPublicListings(query: ListingQuery) {
 
 export async function findPublicListingById(id: string) {
   return cached(`${PUBLIC_CACHE_PREFIX}byId:${id}`, PUBLIC_CACHE_TTL_MS, async () => {
-    const listing = await ListingModel.findOne({ _id: id, status: "Active", isPrivate: false });
+    const query = Types.ObjectId.isValid(id) ? { _id: id } : { slug: id.toLowerCase() };
+    const listing = await ListingModel.findOne({ ...query, status: "Active", isPrivate: false });
     if (!listing) throw ApiError.notFound("Listing not found");
 
     if (listing.type === "Event" && listing.capacity) {

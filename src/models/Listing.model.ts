@@ -57,6 +57,7 @@ export interface DateOverride {
 
 export interface ListingDocument {
   _id: Types.ObjectId;
+  slug?: string;
   title: string;
   type: ListingType;
   categories: string[];
@@ -72,6 +73,7 @@ export interface ListingDocument {
   ownerName?: string;
   sharedWithVendors: boolean;
   coverImage?: string;
+  videoUrl?: string;
   images: ListingImage[];
   country?: string;
   city: string;
@@ -136,6 +138,7 @@ const dateOverrideSchema = new Schema<DateOverride>(
 const listingSchema = new Schema<ListingDocument>(
   {
     title: { type: String, required: true, trim: true, maxlength: 200 },
+    slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     type: { type: String, enum: ["Turf", "Game", "Event"], required: true },
     categories: { type: [String], default: [], index: true },
     subCategories: { type: [String], default: [] },
@@ -149,6 +152,7 @@ const listingSchema = new Schema<ListingDocument>(
     ownerName: { type: String },
     sharedWithVendors: { type: Boolean, default: false },
     coverImage: { type: String },
+    videoUrl: { type: String, default: "" },
     images: { type: [listingImageSchema], default: [] },
     country: { type: String, default: "India" },
     city: { type: String, required: true, index: true },
@@ -199,5 +203,25 @@ listingSchema.index({ status: 1, isPrivate: 1, type: 1, trending: -1, createdAt:
 listingSchema.index({ vendorId: 1, status: 1, isPrivate: 1, type: 1, trending: -1, createdAt: -1 });
 // Vendor panel listing table: { vendorId } sorted by { createdAt }.
 listingSchema.index({ vendorId: 1, createdAt: -1 });
+
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "-")           // Replace spaces with -
+    .replace(/[^\w\-]+/g, "")       // Remove all non-word chars
+    .replace(/\-\-+/g, "-")         // Replace multiple - with single -
+    .replace(/^-+/, "")             // Trim - from start of text
+    .replace(/-+$/, "");            // Trim - from end of text
+}
+
+listingSchema.pre("save", function (next) {
+  if (this.isModified("title") || !this.slug) {
+    const baseSlug = slugify(this.title || "listing");
+    const suffix = this._id.toString().substring(18);
+    this.slug = `${baseSlug}-${suffix}`;
+  }
+  next();
+});
 
 export const ListingModel = model<ListingDocument>("Listing", listingSchema);

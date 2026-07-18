@@ -5,14 +5,14 @@ import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { uploadImageBuffer } from "../../services/upload.service";
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB, matches the frontend's stated limit
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB maximum limit
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
+    if (!file.mimetype.startsWith("image/") && !file.mimetype.startsWith("video/")) {
+      cb(new Error("Only image and video files are allowed"));
       return;
     }
     cb(null, true);

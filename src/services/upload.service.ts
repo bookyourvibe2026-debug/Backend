@@ -17,7 +17,7 @@ export function uploadImageBuffer(buffer: Buffer, folder: string): Promise<Uploa
 
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: `byv/${folder}`, resource_type: "image" },
+      { folder: `byv/${folder}`, resource_type: "auto" },
       (error, result) => {
         if (error || !result) {
           reject(error ?? new Error("Cloudinary upload failed"));

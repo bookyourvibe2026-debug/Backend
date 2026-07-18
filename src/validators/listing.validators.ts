@@ -10,6 +10,7 @@ const couponSchema = z.object({ id: z.string(), code: z.string().min(2), discoun
 export const createListingSchema = z.object({
   title: z.string().trim().min(2).max(200),
   type: z.enum(["Turf", "Game", "Event"]),
+  slug: z.string().optional(),
   categories: z.array(z.string()).min(1),
   subCategories: z.array(z.string()).optional(),
   price: z.number().nonnegative(),
@@ -18,6 +19,7 @@ export const createListingSchema = z.object({
   trending: z.boolean().optional(),
   isPrivate: z.boolean().optional(),
   coverImage: z.string().url().optional(),
+  videoUrl: z.string().url().or(z.string().regex(/^$/)).optional(),
   images: z.array(imageSchema).optional(),
   country: z.string().optional(),
   city: z.string().min(1),
@@ -79,7 +81,7 @@ export const createListingSchema = z.object({
 export const updateListingSchema = createListingSchema.partial();
 
 export const listingIdParamSchema = z.object({
-  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid listing id"),
+  id: z.string().regex(/^[a-f\d]{24}$|^[a-z0-9-]+$/i, "Invalid listing id or slug"),
 });
 
 export const vendorIdParamSchema = z.object({
