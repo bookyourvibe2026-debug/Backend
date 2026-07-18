@@ -26,7 +26,10 @@ export async function connectDatabase(): Promise<void> {
       logger.info(`Found ${listings.length} existing listings requiring slug/coverImage migrations.`);
       for (const listing of listings) {
         if (!listing.coverImage && listing.images && listing.images.length > 0) {
-          listing.coverImage = listing.images[0].url;
+          const firstImage = listing.images[0];
+          if (firstImage) {
+            listing.coverImage = firstImage.url;
+          }
         }
         // save() triggers the pre-save hook to populate the slug
         await listing.save();
