@@ -25,6 +25,12 @@ export async function requestOtp(email: string, purpose: OtpPurpose): Promise<vo
     expiresAt: new Date(Date.now() + env.OTP_TTL_MINUTES * 60_000),
   });
 
+  if (!env.isMailerConfigured) {
+    // eslint-disable-next-line no-console
+    console.log(`\n======================================================\n[DEV ONLY] OTP verification code for ${normalizedEmail} (${purpose}): ${code}\n======================================================\n`);
+    return;
+  }
+
   await sendMail({
     to: normalizedEmail,
     subject: "Your Book Your Vibe verification code",
