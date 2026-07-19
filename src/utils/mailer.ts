@@ -29,6 +29,35 @@ function getTransporter(): Transporter {
 const TRANSIENT_ERROR_CODES = new Set(["ESOCKET", "ETIMEDOUT", "ECONNRESET", "ECONNREFUSED"]);
 
 export async function sendMail(input: { to: string; subject: string; html: string }): Promise<void> {
+  if (env.RESEND_API_KEY) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: env.MAIL_FROM,
+          to: [input.to],
+          subject: input.subject,
+          html: input.html,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        logger.error({ status: response.status, body: errText, to: input.to }, "Failed to send email via Resend API");
+        throw ApiError.serviceUnavailable("Couldn't send the email right now — please try again in a moment.");
+      }
+      return;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      logger.error({ err, to: input.to }, "Failed to send email via Resend API due to a network or server error");
+      throw ApiError.serviceUnavailable("Couldn't send the email right now — please try again in a moment.");
+    }
+  }
+
   const message = {
     from: env.MAIL_FROM,
     to: input.to,

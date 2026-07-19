@@ -39,6 +39,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().default("Book Your Vibe <no-reply@bookyourvibe.in>"),
 
+  RESEND_API_KEY: z.string().optional(),
+
   OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
 });
 
@@ -60,5 +62,5 @@ export const env = {
   corsOrigins: data.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
   isCloudinaryConfigured: !!(data.CLOUDINARY_CLOUD_NAME && data.CLOUDINARY_API_KEY && data.CLOUDINARY_API_SECRET),
   isGoogleAuthConfigured: !!data.GOOGLE_CLIENT_ID,
-  isMailerConfigured: !!(data.SMTP_HOST && data.SMTP_USER && data.SMTP_PASS),
+  isMailerConfigured: !!(data.SMTP_HOST && data.SMTP_USER && data.SMTP_PASS) || !!data.RESEND_API_KEY,
 };
