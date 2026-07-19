@@ -33,7 +33,7 @@ router.use("/banners", bannerRoutes);
 router.use("/bookings", customerBookingsRoutes);
 router.use("/challenges", challengesRoutes);
 router.use("/coaches", coachesRoutes);
-router.use("/coach-bookings", customerCoachesRoutes);
+router.use("/coach-subscriptions", customerCoachesRoutes);
 router.use("/tournaments", tournamentsRoutes);
 router.use("/tournament-registrations", customerTournamentsRoutes);
 router.use("/food", foodRoutes);

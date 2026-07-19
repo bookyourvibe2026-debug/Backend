@@ -4,25 +4,31 @@ import { requireVendorPermission } from "../../middleware/permissions.middleware
 import { resolveVendorScope, requireVendorVertical } from "../../middleware/vendorScope.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import {
-  addSlotSchema,
-  coachBookingListQuerySchema,
+  addLeaveSchema,
+  batchParamSchema,
   coachIdParamSchema,
-  coachSlotParamSchema,
+  createBatchSchema,
   createCoachSchema,
-  orderIdParamSchema,
+  leaveDateParamSchema,
+  subscriptionListQuerySchema,
+  updateBatchSchema,
   updateCoachSchema,
   vendorCoachQuerySchema,
+  weeklyAvailabilitySchema,
 } from "../../validators/coach.validators";
 import {
-  addVendorCoachSlot,
-  checkInVendorCoachBooking,
+  addVendorCoachBatch,
+  addVendorCoachLeave,
   createVendorCoach,
   deleteVendorCoach,
-  getVendorCoachBookings,
   getVendorCoachById,
   getVendorCoaches,
-  removeVendorCoachSlot,
+  getVendorCoachSubscriptions,
+  removeVendorCoachBatch,
+  removeVendorCoachLeave,
+  setVendorCoachAvailability,
   updateVendorCoach,
+  updateVendorCoachBatch,
 } from "./vendor.coaches.controller";
 
 const router = Router();
@@ -33,33 +39,58 @@ router.get("/", requireVendorPermission("coaches", "view"), validate({ query: ve
 router.post("/", requireVendorPermission("coaches", "create"), validate({ body: createCoachSchema }), createVendorCoach);
 
 router.get(
-  "/bookings",
+  "/subscriptions",
   requireVendorPermission("coaches", "view"),
-  validate({ query: coachBookingListQuerySchema }),
-  getVendorCoachBookings
-);
-router.post(
-  "/bookings/:orderId/checkin",
-  requireVendorPermission("coaches", "edit"),
-  validate({ params: orderIdParamSchema }),
-  checkInVendorCoachBooking
+  validate({ query: subscriptionListQuerySchema }),
+  getVendorCoachSubscriptions
 );
 
 router.get("/:id", requireVendorPermission("coaches", "view"), validate({ params: coachIdParamSchema }), getVendorCoachById);
-router.put("/:id", requireVendorPermission("coaches", "edit"), validate({ params: coachIdParamSchema, body: updateCoachSchema }), updateVendorCoach);
+router.put(
+  "/:id",
+  requireVendorPermission("coaches", "edit"),
+  validate({ params: coachIdParamSchema, body: updateCoachSchema }),
+  updateVendorCoach
+);
 router.delete("/:id", requireVendorPermission("coaches", "delete"), validate({ params: coachIdParamSchema }), deleteVendorCoach);
 
-router.post(
-  "/:id/slots",
+router.put(
+  "/:id/availability",
   requireVendorPermission("coaches", "edit"),
-  validate({ params: coachIdParamSchema, body: addSlotSchema }),
-  addVendorCoachSlot
+  validate({ params: coachIdParamSchema, body: weeklyAvailabilitySchema }),
+  setVendorCoachAvailability
+);
+
+router.post(
+  "/:id/batches",
+  requireVendorPermission("coaches", "edit"),
+  validate({ params: coachIdParamSchema, body: createBatchSchema }),
+  addVendorCoachBatch
+);
+router.put(
+  "/:id/batches/:batchId",
+  requireVendorPermission("coaches", "edit"),
+  validate({ params: batchParamSchema, body: updateBatchSchema }),
+  updateVendorCoachBatch
 );
 router.delete(
-  "/:id/slots/:slotId",
+  "/:id/batches/:batchId",
   requireVendorPermission("coaches", "edit"),
-  validate({ params: coachSlotParamSchema }),
-  removeVendorCoachSlot
+  validate({ params: batchParamSchema }),
+  removeVendorCoachBatch
+);
+
+router.post(
+  "/:id/leaves",
+  requireVendorPermission("coaches", "edit"),
+  validate({ params: coachIdParamSchema, body: addLeaveSchema }),
+  addVendorCoachLeave
+);
+router.delete(
+  "/:id/leaves/:date",
+  requireVendorPermission("coaches", "edit"),
+  validate({ params: leaveDateParamSchema }),
+  removeVendorCoachLeave
 );
 
 export default router;

@@ -2,14 +2,17 @@ import { Request, Response } from "express";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
-  addSlot,
-  checkInCoachBooking,
+  addBatch,
+  addLeave,
   createCoach,
   deleteCoach,
   getCoachForVendor,
-  listCoachBookingsForVendor,
   listCoachesForVendor,
-  removeSlot,
+  listSubscriptionsForVendor,
+  removeBatch,
+  removeLeave,
+  setWeeklyAvailability,
+  updateBatch,
   updateCoach,
 } from "../../services/coach.service";
 
@@ -39,28 +42,47 @@ export const deleteVendorCoach = asyncHandler(async (req: Request, res: Response
   sendSuccess(res, 200, null, "Coach removed");
 });
 
-export const addVendorCoachSlot = asyncHandler(async (req: Request, res: Response) => {
-  const coach = await addSlot(req.vendorId!, req.params.id!, req.body);
-  sendSuccess(res, 201, coach, "Slot added");
+/* ---- Weekly availability ---- */
+export const setVendorCoachAvailability = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await setWeeklyAvailability(req.vendorId!, req.params.id!, req.body.days);
+  sendSuccess(res, 200, coach, "Availability updated");
 });
 
-export const removeVendorCoachSlot = asyncHandler(async (req: Request, res: Response) => {
-  const coach = await removeSlot(req.vendorId!, req.params.id!, req.params.slotId!);
-  sendSuccess(res, 200, coach, "Slot removed");
+/* ---- Batches ---- */
+export const addVendorCoachBatch = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await addBatch(req.vendorId!, req.params.id!, req.body);
+  sendSuccess(res, 201, coach, "Batch added");
 });
 
-export const getVendorCoachBookings = asyncHandler(async (req: Request, res: Response) => {
+export const updateVendorCoachBatch = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await updateBatch(req.vendorId!, req.params.id!, req.params.batchId!, req.body);
+  sendSuccess(res, 200, coach, "Batch updated");
+});
+
+export const removeVendorCoachBatch = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await removeBatch(req.vendorId!, req.params.id!, req.params.batchId!);
+  sendSuccess(res, 200, coach, "Batch removed");
+});
+
+/* ---- Leaves ---- */
+export const addVendorCoachLeave = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await addLeave(req.vendorId!, req.params.id!, req.body);
+  sendSuccess(res, 201, coach, "Leave added");
+});
+
+export const removeVendorCoachLeave = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await removeLeave(req.vendorId!, req.params.id!, req.params.date!);
+  sendSuccess(res, 200, coach, "Leave removed");
+});
+
+/* ---- Subscriptions (students) ---- */
+export const getVendorCoachSubscriptions = asyncHandler(async (req: Request, res: Response) => {
   const { status, coachId, page, limit } = req.query as unknown as {
     status?: string;
     coachId?: string;
     page: number;
     limit: number;
   };
-  const result = await listCoachBookingsForVendor(req.vendorId!, { status, coachId, page, limit });
+  const result = await listSubscriptionsForVendor(req.vendorId!, { status, coachId, page, limit });
   sendSuccess(res, 200, result);
-});
-
-export const checkInVendorCoachBooking = asyncHandler(async (req: Request, res: Response) => {
-  const { booking, alreadyCheckedIn } = await checkInCoachBooking(req.params.orderId!, req.vendorId!);
-  sendSuccess(res, 200, booking, alreadyCheckedIn ? "Already checked in" : "Checked in");
 });

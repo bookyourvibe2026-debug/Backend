@@ -1,24 +1,49 @@
-import { FilterQuery } from "mongoose";
+import { FilterQuery, PipelineStage, Types } from "mongoose";
 import { v4 as uuidv4 } from "uuid";
-import { CoachDocument, CoachModel, CoachSlot } from "../models/Coach.model";
-import { CoachBookingDocument, CoachBookingModel } from "../models/CoachBooking.model";
+import { CoachBatch, CoachDocument, CoachModel, CoachWeeklyDay } from "../models/Coach.model";
+import {
+  CoachSubscriptionDocument,
+  CoachSubscriptionModel,
+  CoachSubscriptionPlan,
+} from "../models/CoachSubscription.model";
 import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
 import { paymentProvider } from "./payment/payment.service";
 
+/* --------------------------------- Coach CRUD --------------------------------- */
+
+export interface CoachLocationInput {
+  address?: string;
+  area?: string;
+  city?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export type InlineBatchInput = Omit<CoachBatch, "id">;
+
 export interface CreateCoachInput {
   name: string;
   category: string;
+  categories?: string[];
   subCategory?: string;
+  phone?: string;
+  email?: string;
   experienceYears?: number;
-  fees: number;
+  fees?: number;
   bio?: string;
   photoUrl?: string;
+  gallery?: string[];
   status?: "Active" | "Inactive";
+  location?: CoachLocationInput;
+  /** Slots/batches created together with the coach in a single save. */
+  batches?: InlineBatchInput[];
 }
 
 export async function createCoach(vendorId: string, input: CreateCoachInput) {
-  return CoachModel.create({ ...input, vendorId, slots: [] });
+  const { batches, ...rest } = input;
+  const withIds = (batches ?? []).map((b) => ({ id: uuidv4(), ...b }));
+  return CoachModel.create({ ...rest, vendorId, batches: withIds });
 }
 
 export async function getCoachForVendor(vendorId: string, coachId: string) {
@@ -29,7 +54,11 @@ export async function getCoachForVendor(vendorId: string, coachId: string) {
 
 export async function updateCoach(vendorId: string, coachId: string, input: Partial<CreateCoachInput>) {
   const coach = await getCoachForVendor(vendorId, coachId);
-  coach.set(input);
+  const { batches, ...rest } = input;
+  coach.set(rest);
+  if (batches) {
+    coach.batches = batches.map((b) => ({ id: (b as CoachBatch).id ?? uuidv4(), ...b })) as CoachBatch[];
+  }
   await coach.save();
   return coach;
 }
@@ -45,22 +74,6 @@ export async function listCoachesForVendor(vendorId: string, filters: { status?:
   return paginateCoaches(filter, filters);
 }
 
-export async function listPublicCoaches(filters: { category?: string; vendorId?: string; page: number; limit: number }) {
-  const filter: FilterQuery<CoachDocument> = { status: "Active" };
-  if (filters.category) filter.category = filters.category;
-  if (filters.vendorId) filter.vendorId = filters.vendorId;
-  return paginateCoaches(filter, filters);
-}
-
-export async function getPublicCoachById(coachId: string) {
-  const coach = await CoachModel.findOne({ _id: coachId, status: "Active" });
-  if (!coach) throw ApiError.notFound("Coach not found");
-
-  const now = new Date();
-  const openSlots = coach.slots.filter((slot) => !slot.isBooked && slot.date >= now);
-  return { ...coach.toObject(), slots: openSlots };
-}
-
 async function paginateCoaches(
   filter: FilterQuery<CoachDocument>,
   { page, limit }: { page: number; limit: number }
@@ -73,27 +86,161 @@ async function paginateCoaches(
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
-export async function addSlot(vendorId: string, coachId: string, input: { date: Date; startTime: string; endTime: string }) {
+/* ----------------------------- Weekly availability ----------------------------- */
+
+export async function setWeeklyAvailability(vendorId: string, coachId: string, days: CoachWeeklyDay[]) {
   const coach = await getCoachForVendor(vendorId, coachId);
-  const slot: CoachSlot = { id: uuidv4(), date: input.date, startTime: input.startTime, endTime: input.endTime, isBooked: false };
-  coach.slots.push(slot);
+  coach.weeklyAvailability = days;
   await coach.save();
   return coach;
 }
 
-export async function removeSlot(vendorId: string, coachId: string, slotId: string) {
+/* --------------------------------- Batches --------------------------------- */
+
+export type BatchInput = Omit<CoachBatch, "id">;
+
+export async function addBatch(vendorId: string, coachId: string, input: BatchInput) {
   const coach = await getCoachForVendor(vendorId, coachId);
-  const slot = coach.slots.find((s) => s.id === slotId);
-  if (!slot) throw ApiError.notFound("Slot not found");
-  if (slot.isBooked) throw ApiError.badRequest("This slot already has a booking and cannot be removed");
-  coach.slots = coach.slots.filter((s) => s.id !== slotId);
+  const batch: CoachBatch = { id: uuidv4(), ...input };
+  coach.batches.push(batch);
   await coach.save();
   return coach;
 }
 
-export interface BookCoachSlotInput {
+export async function updateBatch(vendorId: string, coachId: string, batchId: string, input: Partial<BatchInput>) {
+  const coach = await getCoachForVendor(vendorId, coachId);
+  const batch = coach.batches.find((b) => b.id === batchId);
+  if (!batch) throw ApiError.notFound("Batch not found");
+  Object.assign(batch, input);
+  await coach.save();
+  return coach;
+}
+
+export async function removeBatch(vendorId: string, coachId: string, batchId: string) {
+  const coach = await getCoachForVendor(vendorId, coachId);
+  const activeSubs = await CoachSubscriptionModel.countDocuments({ coachId, batchId, status: "Active" });
+  if (activeSubs > 0) throw ApiError.badRequest("This batch has active students and cannot be removed");
+  coach.batches = coach.batches.filter((b) => b.id !== batchId);
+  await coach.save();
+  return coach;
+}
+
+/* ---------------------------------- Leaves ---------------------------------- */
+
+function sameDay(a: Date, b: Date) {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
+}
+
+export async function addLeave(vendorId: string, coachId: string, input: { date: Date; type?: "full" | "half"; reason?: string }) {
+  const coach = await getCoachForVendor(vendorId, coachId);
+  // Re-marking the same date updates its type/reason instead of duplicating.
+  coach.leaves = coach.leaves.filter((l) => !sameDay(new Date(l.date), new Date(input.date)));
+  coach.leaves.push({ date: input.date, type: input.type ?? "full", reason: input.reason });
+  await coach.save();
+  return coach;
+}
+
+export async function removeLeave(vendorId: string, coachId: string, isoDate: string) {
+  const coach = await getCoachForVendor(vendorId, coachId);
+  const target = new Date(isoDate);
+  coach.leaves = coach.leaves.filter((l) => !sameDay(new Date(l.date), target));
+  await coach.save();
+  return coach;
+}
+
+/* ------------------------------- Public browse ------------------------------- */
+
+export interface PublicCoachFilters {
+  category?: string;
+  vendorId?: string;
+  city?: string;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Public coach listing. When lat/lng are supplied we sort by distance (nearest
+ * first) via $geoNear and attach a distanceKm to each card; otherwise fall back
+ * to a plain city/category filter sorted by recency.
+ */
+export async function listPublicCoaches(filters: PublicCoachFilters) {
+  const match: FilterQuery<CoachDocument> = { status: "Active" };
+  // Match either the legacy primary category or any sport in the multi-sport list.
+  if (filters.category) match.$or = [{ category: filters.category }, { categories: filters.category }];
+  if (filters.vendorId) match.vendorId = new Types.ObjectId(filters.vendorId);
+  if (filters.city) match["location.city"] = new RegExp(`^${escapeRegex(filters.city)}$`, "i");
+
+  const skip = (filters.page - 1) * filters.limit;
+
+  if (typeof filters.lat === "number" && typeof filters.lng === "number") {
+    const maxDistance = (filters.radiusKm ?? 50) * 1000; // metres
+    const pipeline: PipelineStage[] = [
+      {
+        $geoNear: {
+          near: { type: "Point", coordinates: [filters.lng, filters.lat] },
+          distanceField: "distanceMeters",
+          maxDistance,
+          spherical: true,
+          query: match,
+        },
+      },
+    ];
+    const [items, countResult] = await Promise.all([
+      CoachModel.aggregate([...pipeline, { $skip: skip }, { $limit: filters.limit }]),
+      CoachModel.aggregate([...pipeline, { $count: "total" }]),
+    ]);
+    const total = countResult[0]?.total ?? 0;
+    const withDistance = items.map((c) => ({
+      ...c,
+      distanceKm: typeof c.distanceMeters === "number" ? Math.round((c.distanceMeters / 1000) * 10) / 10 : undefined,
+    }));
+    return { items: withDistance, total, page: filters.page, limit: filters.limit, pages: Math.ceil(total / filters.limit) };
+  }
+
+  const [items, total] = await Promise.all([
+    CoachModel.find(match).sort({ createdAt: -1 }).skip(skip).limit(filters.limit).lean(),
+    CoachModel.countDocuments(match),
+  ]);
+  return { items, total, page: filters.page, limit: filters.limit, pages: Math.ceil(total / filters.limit) };
+}
+
+/** Coach profile for customers, with live spots-left per batch and upcoming holidays. */
+export async function getPublicCoachById(coachId: string) {
+  const coach = await CoachModel.findOne({ _id: coachId, status: "Active" }).lean();
+  if (!coach) throw ApiError.notFound("Coach not found");
+
+  const counts = await CoachSubscriptionModel.aggregate<{ _id: string; count: number }>([
+    { $match: { coachId: new Types.ObjectId(coachId), status: "Active" } },
+    { $group: { _id: "$batchId", count: { $sum: 1 } } },
+  ]);
+  const enrolledByBatch = new Map(counts.map((c) => [c._id, c.count]));
+
+  const batches = (coach.batches ?? []).map((b) => {
+    const enrolled = enrolledByBatch.get(b.id) ?? 0;
+    return { ...b, enrolled, spotsLeft: Math.max(0, b.capacity - enrolled) };
+  });
+
+  // Only surface today-or-future leaves to customers.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const upcomingLeaves = (coach.leaves ?? []).filter((l) => new Date(l.date) >= todayStart);
+
+  return { ...coach, batches, leaves: upcomingLeaves };
+}
+
+/* ------------------------------- Subscriptions ------------------------------- */
+
+export interface EnrollInput {
   coachId: string;
-  slotId: string;
+  batchId: string;
+  plan: CoachSubscriptionPlan;
   customerId?: string;
   customerName: string;
   phone: string;
@@ -101,23 +248,44 @@ export interface BookCoachSlotInput {
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
 }
 
-export async function bookCoachSlot(input: BookCoachSlotInput): Promise<CoachBookingDocument> {
-  // Atomically claim the slot so two concurrent bookers can't both win it.
-  const coach = await CoachModel.findOneAndUpdate(
-    { _id: input.coachId, status: "Active", "slots.id": input.slotId, "slots.isBooked": false },
-    { $set: { "slots.$.isBooked": true } },
-    { new: true }
-  );
-  if (!coach) throw ApiError.badRequest("This slot is no longer available");
+function planPrice(batch: CoachBatch, plan: CoachSubscriptionPlan): number {
+  if (plan === "demo") return 0;
+  return plan === "yearly" ? batch.priceYearly : batch.priceMonthly;
+}
 
-  const slot = coach.slots.find((s) => s.id === input.slotId)!;
+function planEndDate(plan: CoachSubscriptionPlan, start: Date): Date | null {
+  if (plan === "demo") return null;
+  const end = new Date(start);
+  if (plan === "yearly") end.setFullYear(end.getFullYear() + 1);
+  else end.setMonth(end.getMonth() + 1);
+  return end;
+}
+
+export async function enrollInBatch(input: EnrollInput): Promise<CoachSubscriptionDocument> {
+  const coach = await CoachModel.findOne({ _id: input.coachId, status: "Active" });
+  if (!coach) throw ApiError.badRequest("Coach is not available");
+
+  const batch = coach.batches.find((b) => b.id === input.batchId);
+  if (!batch || !batch.active) throw ApiError.badRequest("This batch is not available");
+  if (input.plan === "demo" && !batch.demoAvailable) throw ApiError.badRequest("Demo is not available for this batch");
+
+  // Capacity guard — count active students in this batch before claiming a seat.
+  const enrolled = await CoachSubscriptionModel.countDocuments({
+    coachId: coach._id,
+    batchId: batch.id,
+    status: "Active",
+  });
+  if (enrolled >= batch.capacity) throw ApiError.badRequest("This batch is full");
+
+  const amount = planPrice(batch, input.plan);
+  const start = new Date();
   const orderId = generateOrderId();
 
   let paymentOrderId: string | undefined;
-  if (input.payment === "Cashfree (Online)") {
+  if (input.payment === "Cashfree (Online)" && amount > 0) {
     const order = await paymentProvider.createOrder({
       orderId,
-      amount: coach.fees,
+      amount,
       customerName: input.customerName,
       customerEmail: input.email,
       customerPhone: input.phone,
@@ -125,100 +293,74 @@ export async function bookCoachSlot(input: BookCoachSlotInput): Promise<CoachBoo
     paymentOrderId = order.providerOrderId;
   }
 
-  try {
-    return await CoachBookingModel.create({
-      orderId,
-      coachId: coach._id,
-      vendorId: coach.vendorId,
-      customerId: input.customerId ?? null,
-      customerName: input.customerName,
-      phone: input.phone,
-      email: input.email,
-      slotId: slot.id,
-      slotDate: slot.date,
-      slotStartTime: slot.startTime,
-      slotEndTime: slot.endTime,
-      amount: coach.fees,
-      payment: input.payment,
-      paymentOrderId,
-      paymentStatus: "pending",
-      status: "Confirmed",
-    });
-  } catch (err) {
-    // Booking record failed after the slot was claimed — release it back rather than strand it.
-    await CoachModel.updateOne({ _id: coach._id, "slots.id": slot.id }, { $set: { "slots.$.isBooked": false } });
-    throw err;
-  }
+  return CoachSubscriptionModel.create({
+    orderId,
+    coachId: coach._id,
+    vendorId: coach.vendorId,
+    batchId: batch.id,
+    batchName: batch.name,
+    customerId: input.customerId ?? null,
+    customerName: input.customerName,
+    phone: input.phone,
+    email: input.email,
+    plan: input.plan,
+    amount,
+    startDate: start,
+    endDate: planEndDate(input.plan, start),
+    payment: input.payment,
+    paymentOrderId,
+    paymentStatus: amount === 0 ? "paid" : "pending",
+    status: "Active",
+  });
 }
 
-export async function listMyCoachBookings(customerId: string, filters: { status?: string; page: number; limit: number }) {
-  const filter: FilterQuery<CoachBookingDocument> = { customerId };
+export async function listMySubscriptions(customerId: string, filters: { status?: string; page: number; limit: number }) {
+  const filter: FilterQuery<CoachSubscriptionDocument> = { customerId };
   if (filters.status) filter.status = filters.status;
-  return paginateCoachBookings(filter, filters);
+  return paginateSubscriptions(filter, filters);
 }
 
-export async function listCoachBookingsForVendor(
+export async function listSubscriptionsForVendor(
   vendorId: string,
   filters: { status?: string; coachId?: string; page: number; limit: number }
 ) {
-  const filter: FilterQuery<CoachBookingDocument> = { vendorId };
+  const filter: FilterQuery<CoachSubscriptionDocument> = { vendorId };
   if (filters.status) filter.status = filters.status;
   if (filters.coachId) filter.coachId = filters.coachId;
-  return paginateCoachBookings(filter, filters);
+  return paginateSubscriptions(filter, filters);
 }
 
-async function paginateCoachBookings(
-  filter: FilterQuery<CoachBookingDocument>,
+async function paginateSubscriptions(
+  filter: FilterQuery<CoachSubscriptionDocument>,
   { page, limit }: { page: number; limit: number }
 ) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    CoachBookingModel.find(filter).sort({ slotDate: -1 }).skip(skip).limit(limit),
-    CoachBookingModel.countDocuments(filter),
+    CoachSubscriptionModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    CoachSubscriptionModel.countDocuments(filter),
   ]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
-export async function getCoachBookingByOrderId(orderId: string, scope?: { customerId?: string; vendorId?: string }) {
-  const filter: FilterQuery<CoachBookingDocument> = { orderId };
+export async function getSubscriptionByOrderId(orderId: string, scope?: { customerId?: string; vendorId?: string }) {
+  const filter: FilterQuery<CoachSubscriptionDocument> = { orderId };
   if (scope?.customerId) filter.customerId = scope.customerId;
   if (scope?.vendorId) filter.vendorId = scope.vendorId;
 
-  const booking = await CoachBookingModel.findOne(filter);
-  if (!booking) throw ApiError.notFound("Coach booking not found");
-  return booking;
+  const sub = await CoachSubscriptionModel.findOne(filter);
+  if (!sub) throw ApiError.notFound("Subscription not found");
+  return sub;
 }
 
-export async function cancelMyCoachBooking(orderId: string, customerId: string, reason?: string) {
-  const booking = await getCoachBookingByOrderId(orderId, { customerId });
-  if (booking.status === "Completed") {
-    throw ApiError.badRequest("A completed session cannot be cancelled");
-  }
-  booking.status = "Cancelled";
-  booking.cancellationReason = reason;
-  await booking.save();
-
-  await CoachModel.updateOne(
-    { _id: booking.coachId, "slots.id": booking.slotId },
-    { $set: { "slots.$.isBooked": false } }
-  );
-
-  return booking;
+export async function cancelMySubscription(orderId: string, customerId: string, reason?: string) {
+  const sub = await getSubscriptionByOrderId(orderId, { customerId });
+  if (sub.status !== "Active") throw ApiError.badRequest("This subscription is not active");
+  sub.status = "Cancelled";
+  sub.cancellationReason = reason;
+  await sub.save();
+  return sub;
 }
 
-/** Same convention as turf-booking QR check-in: the "QR" simply encodes the orderId. */
-export async function checkInCoachBooking(orderId: string, vendorId: string) {
-  const booking = await getCoachBookingByOrderId(orderId, { vendorId });
-
-  if (booking.status === "Cancelled") {
-    throw ApiError.badRequest("This booking was cancelled and cannot be checked in");
-  }
-  if (booking.checkedIn) {
-    return { booking, alreadyCheckedIn: true };
-  }
-
-  booking.checkedIn = true;
-  booking.checkedInAt = new Date();
-  await booking.save();
-  return { booking, alreadyCheckedIn: false };
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
