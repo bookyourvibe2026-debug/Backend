@@ -28,10 +28,18 @@ export async function requestOtp(email: string, purpose: OtpPurpose): Promise<vo
   if (env.isDevelopment) {
     // eslint-disable-next-line no-console
     console.log(`\n======================================================\n[DEV ONLY] OTP verification code for ${normalizedEmail} (${purpose}): ${code}\n======================================================\n`);
+
+    if (!env.isMailerConfigured) {
+      // Local dev convenience only — the code above is logged to the console
+      // instead of emailed, so registration/reset can be tested without real SMTP.
+      return;
+    }
   }
 
   if (!env.isMailerConfigured) {
-    return;
+    // In production this must be a loud, visible failure — never a silent
+    // "success" that hides a missing/broken SMTP config from whoever's watching.
+    throw ApiError.serviceUnavailable("Email service isn't configured on the server — the verification code could not be sent.");
   }
 
   await sendMail({
