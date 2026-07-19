@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
+/** Accepts either a real ObjectId or a URL slug — used where customers hit a coach by its public link. */
+const idOrSlug = z.string().regex(/^[a-f\d]{24}$|^[a-z0-9-]+$/i, "Invalid coach id or slug");
 const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm");
 
 const locationSchema = z.object({
@@ -46,7 +48,7 @@ export const createCoachSchema = z.object({
 export const updateCoachSchema = createCoachSchema.partial();
 
 export const coachIdParamSchema = z.object({
-  id: objectId,
+  id: idOrSlug,
 });
 
 export const batchParamSchema = z.object({

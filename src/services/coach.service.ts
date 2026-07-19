@@ -211,13 +211,14 @@ export async function listPublicCoaches(filters: PublicCoachFilters) {
   return { items, total, page: filters.page, limit: filters.limit, pages: Math.ceil(total / filters.limit) };
 }
 
-/** Coach profile for customers, with live spots-left per batch and upcoming holidays. */
+/** Coach profile for customers, with live spots-left per batch and upcoming holidays. Accepts either the coach's real id or its public slug. */
 export async function getPublicCoachById(coachId: string) {
-  const coach = await CoachModel.findOne({ _id: coachId, status: "Active" }).lean();
+  const query = Types.ObjectId.isValid(coachId) ? { _id: coachId } : { slug: coachId.toLowerCase() };
+  const coach = await CoachModel.findOne({ ...query, status: "Active" }).lean();
   if (!coach) throw ApiError.notFound("Coach not found");
 
   const counts = await CoachSubscriptionModel.aggregate<{ _id: string; count: number }>([
-    { $match: { coachId: new Types.ObjectId(coachId), status: "Active" } },
+    { $match: { coachId: coach._id, status: "Active" } },
     { $group: { _id: "$batchId", count: { $sum: 1 } } },
   ]);
   const enrolledByBatch = new Map(counts.map((c) => [c._id, c.count]));

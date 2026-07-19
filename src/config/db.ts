@@ -39,6 +39,22 @@ export async function connectDatabase(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Error running listing migrations");
   }
+
+  // Auto-populate missing slugs for existing coaches
+  try {
+    const { CoachModel } = await import("../models/Coach.model");
+    const coaches = await CoachModel.find({ $or: [{ slug: { $exists: false } }, { slug: "" }] });
+    if (coaches.length > 0) {
+      logger.info(`Found ${coaches.length} existing coaches requiring slug migrations.`);
+      for (const coach of coaches) {
+        // save() triggers the pre-save hook to populate the slug
+        await coach.save();
+      }
+      logger.info("Existing coach migrations completed successfully.");
+    }
+  } catch (err) {
+    logger.error({ err }, "Error running coach migrations");
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {

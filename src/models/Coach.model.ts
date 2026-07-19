@@ -48,6 +48,7 @@ export interface CoachLocation {
 export interface CoachDocument {
   _id: Types.ObjectId;
   vendorId: Types.ObjectId;
+  slug?: string;
   name: string;
   /** Primary sport — kept in sync with categories[0] for back-compat with legacy filters. */
   category: string;
@@ -123,6 +124,7 @@ const locationSchema = new Schema<CoachLocation>(
 const coachSchema = new Schema<CoachDocument>(
   {
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true, index: true },
+    slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     category: { type: String, required: true },
     categories: { type: [String], default: [] },
@@ -146,6 +148,28 @@ const coachSchema = new Schema<CoachDocument>(
   },
   { timestamps: true }
 );
+
+function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+}
+
+// Give every coach a readable, stable URL slug — "rohan-sharma-a1b2c3" — instead
+// of exposing the raw Mongo _id in customer-facing links.
+coachSchema.pre("save", function syncSlug(next) {
+  if (this.isModified("name") || !this.slug) {
+    const baseSlug = slugify(this.name || "coach");
+    const suffix = this._id.toString().slice(-6);
+    this.slug = `${baseSlug}-${suffix}`;
+  }
+  next();
+});
 
 function defaultWeek(): CoachWeeklyDay[] {
   return Array.from({ length: 7 }, (_, day) => ({
