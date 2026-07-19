@@ -22,14 +22,19 @@ export const foodVendorIdParamSchema = z.object({
 });
 
 export const createFoodOrderSchema = z.object({
-  vendorId: objectId,
+  /** Either outletId (new flow) or vendorId (legacy clients) must identify the kitchen. */
+  outletId: objectId.optional(),
+  vendorId: objectId.optional(),
   items: z
     .array(
       z.object({
         menuItemId: objectId,
         quantity: z.coerce.number().int().positive(),
+        variantLabel: z.string().trim().max(40).optional(),
       })
     )
     .min(1, "Add at least one item"),
   notes: z.string().trim().max(300).optional(),
+  // Note: at least one of outletId/vendorId is required — enforced in createFoodOrder,
+  // which throws "Restaurant not found" when neither resolves (validate() needs a plain ZodObject).
 });

@@ -120,7 +120,13 @@ export const membershipIdParamSchema = z.object({
   id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id"),
 });
 
+const priceVariantSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  price: z.coerce.number().min(0),
+});
+
 export const createMenuItemSchema = z.object({
+  outletId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid outlet id").optional(),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional(),
   price: z.coerce.number().min(0),
@@ -128,9 +134,11 @@ export const createMenuItemSchema = z.object({
   photo: z.string().url().optional(),
   inStock: z.boolean().optional(),
   prepTimeMins: z.coerce.number().int().min(0).optional(),
+  priceVariants: z.array(priceVariantSchema).max(10).optional(),
 });
 
 export const updateMenuItemSchema = z.object({
+  outletId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid outlet id").optional(),
   name: z.string().trim().min(2).max(120).optional(),
   description: z.string().trim().max(500).optional(),
   price: z.coerce.number().min(0).optional(),
@@ -138,6 +146,11 @@ export const updateMenuItemSchema = z.object({
   photo: z.string().url().optional(),
   inStock: z.boolean().optional(),
   prepTimeMins: z.coerce.number().int().min(0).optional(),
+  priceVariants: z.array(priceVariantSchema).max(10).optional(),
+});
+
+export const menuListQuerySchema = z.object({
+  outletId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid outlet id").optional(),
 });
 
 export const menuItemIdParamSchema = z.object({

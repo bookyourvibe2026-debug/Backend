@@ -15,6 +15,10 @@ export interface BookingDocument {
   email?: string;
   /** Which sport the slot was booked for (vendor-entered on manual bookings). */
   sport?: string;
+  /** How many players are coming (vendor-entered on manual bookings). */
+  numberOfPlayers?: number;
+  /** Whether food & beverage is included with this booking. */
+  foodIncluded?: boolean;
   dateTime: Date;
   endTime?: string;
   totalAmount: number;
@@ -44,6 +48,8 @@ const bookingSchema = new Schema<BookingDocument>(
     phone: { type: String, required: true },
     email: { type: String },
     sport: { type: String },
+    numberOfPlayers: { type: Number, min: 1, max: 200 },
+    foodIncluded: { type: Boolean },
     dateTime: { type: Date, required: true },
     /** Slot end as "HH:mm"; optional so existing bookings stay valid. */
     endTime: { type: String },

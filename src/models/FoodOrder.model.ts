@@ -7,12 +7,16 @@ export interface FoodOrderItem {
   name: string;
   price: number;
   quantity: number;
+  /** Which size/portion tier was ordered, when the dish has priceVariants. */
+  variantLabel?: string;
 }
 
 export interface FoodOrderDocument {
   _id: Types.ObjectId;
   orderId: string;
   vendorId: Types.ObjectId;
+  /** Outlet the order was placed against. Backfilled for legacy orders. */
+  outletId?: Types.ObjectId;
   customerId: Types.ObjectId;
   customerName: string;
   phone: string;
@@ -32,6 +36,7 @@ const foodOrderItemSchema = new Schema<FoodOrderItem>(
     name: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
+    variantLabel: { type: String, trim: true, maxlength: 40 },
   },
   { _id: false }
 );
@@ -40,6 +45,7 @@ const foodOrderSchema = new Schema<FoodOrderDocument>(
   {
     orderId: { type: String, required: true, unique: true },
     vendorId: { type: Schema.Types.ObjectId, required: true },
+    outletId: { type: Schema.Types.ObjectId, ref: "FoodOutlet", index: true },
     customerId: { type: Schema.Types.ObjectId, required: true },
     customerName: { type: String, required: true },
     phone: { type: String, required: true },

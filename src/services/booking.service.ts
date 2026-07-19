@@ -129,6 +129,8 @@ export interface CreateManualBookingInput {
   customerName: string;
   phone: string;
   sport?: string;
+  numberOfPlayers?: number;
+  foodIncluded?: boolean;
   dateTime: Date;
   endTime?: string;
   totalAmount: number;
@@ -150,6 +152,8 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
     customerName: input.customerName,
     phone: input.phone,
     sport: input.sport,
+    numberOfPlayers: input.numberOfPlayers,
+    foodIncluded: input.foodIncluded,
     dateTime: input.dateTime,
     endTime: input.endTime,
     totalAmount: pricing.totalAmount,

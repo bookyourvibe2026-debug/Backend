@@ -55,6 +55,52 @@ export async function connectDatabase(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "Error running coach migrations");
   }
+
+  // Food multi-outlet migration: every food vendor gets a default FoodOutlet
+  // (from their Vendor profile), and legacy MenuItems/FoodOrders that predate
+  // outlets get stamped with it. Idempotent — only touches docs missing outletId.
+  try {
+    const { VendorModel } = await import("../models/Vendor.model");
+    const { FoodOutletModel } = await import("../models/FoodOutlet.model");
+    const { MenuItemModel } = await import("../models/MenuItem.model");
+    const { FoodOrderModel } = await import("../models/FoodOrder.model");
+
+    const foodVendors = await VendorModel.find({ verticals: "food" }).select(
+      "businessName logo banner poster city state categories"
+    );
+    for (const vendor of foodVendors) {
+      let outlet = await FoodOutletModel.findOne({ vendorId: vendor._id }).sort({ createdAt: 1 });
+      const orphanFilter = { vendorId: vendor._id, outletId: { $exists: false } };
+      const [orphanItems, orphanOrders] = await Promise.all([
+        MenuItemModel.countDocuments(orphanFilter),
+        FoodOrderModel.countDocuments(orphanFilter),
+      ]);
+      if (!outlet && orphanItems === 0 && orphanOrders === 0) continue;
+
+      if (!outlet) {
+        outlet = await FoodOutletModel.create({
+          vendorId: vendor._id,
+          name: vendor.businessName || "My Restaurant",
+          logo: vendor.logo,
+          banner: vendor.banner,
+          poster: vendor.poster,
+          cuisines: vendor.categories ?? [],
+          location: { city: vendor.city },
+        });
+        logger.info(`Created default food outlet for vendor ${vendor.businessName}`);
+      }
+
+      if (orphanItems > 0 || orphanOrders > 0) {
+        await Promise.all([
+          MenuItemModel.updateMany(orphanFilter, { $set: { outletId: outlet._id } }),
+          FoodOrderModel.updateMany(orphanFilter, { $set: { outletId: outlet._id } }),
+        ]);
+        logger.info(`Backfilled outletId onto ${orphanItems} menu items and ${orphanOrders} orders for ${vendor.businessName}`);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Error running food outlet migrations");
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {

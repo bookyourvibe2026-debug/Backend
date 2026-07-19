@@ -6,6 +6,24 @@ import { ApiError } from "../../utils/ApiError";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { createFoodOrder, getFoodOrderByOrderId, listFoodOrdersForCustomer } from "../../services/foodOrder.service";
+import { getPublicOutletWithMenu, listPublicOutlets } from "../../services/foodOutlet.service";
+
+export const listOutlets = asyncHandler(async (req: Request, res: Response) => {
+  const { cuisine, city, kind, page, limit } = req.query as unknown as {
+    cuisine?: string;
+    city?: string;
+    kind?: "dining" | "venue";
+    page: number;
+    limit: number;
+  };
+  const result = await listPublicOutlets({ cuisine, city, kind, page, limit });
+  sendSuccess(res, 200, result);
+});
+
+export const getOutletMenu = asyncHandler(async (req: Request, res: Response) => {
+  const result = await getPublicOutletWithMenu(req.params.id!);
+  sendSuccess(res, 200, result);
+});
 
 export const listFoodVendors = asyncHandler(async (_req: Request, res: Response) => {
   const vendors = await VendorModel.find({
@@ -35,6 +53,7 @@ export const placeFoodOrder = asyncHandler(async (req: Request, res: Response) =
     customerId: customer._id.toString(),
     customerName: customer.name,
     phone: customer.phone ?? "",
+    outletId: req.body.outletId,
     vendorId: req.body.vendorId,
     items: req.body.items,
     notes: req.body.notes,

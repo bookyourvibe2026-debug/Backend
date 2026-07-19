@@ -1,5 +1,6 @@
 import { FilterQuery } from "mongoose";
 import { FoodOrderDocument, FoodOrderItem, FoodOrderModel, FoodOrderStatus } from "../models/FoodOrder.model";
+import { FoodOutletModel } from "../models/FoodOutlet.model";
 import { MenuItemModel } from "../models/MenuItem.model";
 import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
@@ -63,17 +64,32 @@ export async function createFoodOrder(input: {
   customerId: string;
   customerName: string;
   phone: string;
-  vendorId: string;
-  items: { menuItemId: string; quantity: number }[];
+  /** New clients send outletId; legacy clients send vendorId only. */
+  outletId?: string;
+  vendorId?: string;
+  items: { menuItemId: string; quantity: number; variantLabel?: string }[];
   notes?: string;
 }) {
   if (input.items.length === 0) {
     throw ApiError.badRequest("Add at least one item to place an order");
   }
 
+  let outletId = input.outletId;
+  let vendorId = input.vendorId;
+  if (outletId) {
+    const outlet = await FoodOutletModel.findOne({ _id: outletId, status: "Active" }).select("vendorId");
+    if (!outlet) throw ApiError.badRequest("This restaurant is not available right now");
+    vendorId = outlet.vendorId.toString();
+  } else if (vendorId) {
+    // Legacy path: resolve the vendor's default (first) outlet so the order still lands somewhere.
+    const outlet = await FoodOutletModel.findOne({ vendorId }).sort({ createdAt: 1 }).select("_id");
+    outletId = outlet?._id.toString();
+  }
+  if (!vendorId) throw ApiError.badRequest("Restaurant not found");
+
   const menuItems = await MenuItemModel.find({
     _id: { $in: input.items.map((i) => i.menuItemId) },
-    vendorId: input.vendorId,
+    vendorId,
     inStock: true,
   });
 
@@ -82,6 +98,24 @@ export async function createFoodOrder(input: {
     if (!menuItem) {
       throw ApiError.badRequest("One or more menu items are unavailable. Please refresh the menu and try again.");
     }
+
+    // Variant-priced dishes require a valid variant pick; price always comes from the server.
+    if (menuItem.priceVariants.length > 0) {
+      const variant = menuItem.priceVariants.find(
+        (v) => v.label.toLowerCase() === (requested.variantLabel ?? "").toLowerCase()
+      );
+      if (!variant) {
+        throw ApiError.badRequest(`Please pick a size/option for "${menuItem.name}"`);
+      }
+      return {
+        menuItemId: menuItem._id,
+        name: menuItem.name,
+        price: variant.price,
+        quantity: requested.quantity,
+        variantLabel: variant.label,
+      };
+    }
+
     return {
       menuItemId: menuItem._id,
       name: menuItem.name,
@@ -94,7 +128,8 @@ export async function createFoodOrder(input: {
 
   return FoodOrderModel.create({
     orderId: generateOrderId(),
-    vendorId: input.vendorId,
+    vendorId,
+    outletId,
     customerId: input.customerId,
     customerName: input.customerName,
     phone: input.phone,
