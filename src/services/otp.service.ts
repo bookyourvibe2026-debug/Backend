@@ -1,7 +1,7 @@
 import { env } from "../config/env";
 import { OtpModel, type OtpPurpose } from "../models/Otp.model";
 import { ApiError } from "../utils/ApiError";
-import { otpEmailHtml, sendMail } from "../utils/mailer";
+import { otpEmailHtml, otpEmailText, sendMail } from "../utils/mailer";
 import { generateOtp, hashToken } from "../utils/password";
 
 const MAX_ATTEMPTS = 5;
@@ -46,6 +46,7 @@ export async function requestOtp(email: string, purpose: OtpPurpose): Promise<vo
     to: normalizedEmail,
     subject: "Your Book Your Vibe verification code",
     html: otpEmailHtml(code, PURPOSE_LABELS[purpose]),
+    text: otpEmailText(code, PURPOSE_LABELS[purpose]),
   });
 }
 
