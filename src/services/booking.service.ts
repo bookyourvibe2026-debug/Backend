@@ -122,6 +122,16 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
       );
     }
+
+    // Also honour slots the vendor has blocked (maintenance etc.) for this date.
+    const blockedClash = slots.find(
+      (s) => s.blocked && rangesOverlap(startMin, startMin + durationMin, timeToMinutes(s.startTime), timeToMinutes(s.endTime))
+    );
+    if (blockedClash) {
+      throw ApiError.conflict(
+        `This time is unavailable — the venue has blocked ${blockedClash.startTime} - ${blockedClash.endTime}.`
+      );
+    }
   } else if (input.priceTierId) {
     const tier = listing.priceTiers.find((t) => t.id === input.priceTierId);
     if (!tier) throw ApiError.badRequest("Selected price tier is not valid for this listing");
