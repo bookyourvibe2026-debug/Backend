@@ -84,6 +84,10 @@ export const listingIdParamSchema = z.object({
   id: z.string().regex(/^[a-f\d]{24}$|^[a-z0-9-]+$/i, "Invalid listing id or slug"),
 });
 
+export const availabilityQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+});
+
 export const vendorIdParamSchema = z.object({
   vendorId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid vendor id"),
 });

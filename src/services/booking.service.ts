@@ -36,6 +36,51 @@ export interface CreateBookingInput {
   durationMinutes?: number;
 }
 
+/* ── Slot availability ──
+ * Bookings store their slot start as a UTC instant plus an optional "HH:mm" end;
+ * everything below works in IST because that's the timezone slots are sold in. */
+const IST = "Asia/Kolkata";
+
+function istTimeHHmm(d: Date): string {
+  return d.toLocaleTimeString("en-GB", { timeZone: IST, hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function timeToMinutes(t: string): number {
+  const [h = 0, m = 0] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export interface BookedRange {
+  startTime: string;
+  endTime: string;
+  status: "Confirmed" | "Pending" | "Completed";
+}
+
+/** Non-cancelled bookings for one listing on one IST calendar date, as HH:mm ranges. */
+export async function getBookedRangesForDate(listingId: string, date: string): Promise<BookedRange[]> {
+  const dayStart = new Date(`${date}T00:00:00+05:30`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+  const bookings = await BookingModel.find({
+    listingId,
+    status: { $ne: "Cancelled" },
+    dateTime: { $gte: dayStart, $lt: dayEnd },
+  }).select("dateTime endTime status");
+
+  return bookings.map((b) => ({
+    startTime: istTimeHHmm(b.dateTime),
+    // Legacy bookings without a stored end are assumed to run one hour.
+    endTime: b.endTime || istTimeHHmm(new Date(b.dateTime.getTime() + 60 * 60_000)),
+    status: b.status as BookedRange["status"],
+  }));
+}
+
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  // Ranges crossing midnight (end <= start) extend into the next day.
+  const aE = aEnd <= aStart ? aEnd + 1440 : aEnd;
+  const bE = bEnd <= bStart ? bEnd + 1440 : bEnd;
+  return aStart < bE && bStart < aE;
+}
+
 export async function createBooking(input: CreateBookingInput): Promise<BookingDocument> {
   const listing = await ListingModel.findOne({ _id: input.listingId, status: "Active", isPrivate: false });
   if (!listing) throw ApiError.notFound("Listing not found or unavailable");
@@ -43,7 +88,8 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   let baseAmount = listing.price;
   if (listing.type === "Turf") {
     const bDate = new Date(input.dateTime);
-    const dateStr = bDate.toISOString().slice(0, 10);
+    // IST calendar date — toISOString() would shift slots before 5:30 AM to the previous day.
+    const dateStr = bDate.toLocaleDateString("en-CA", { timeZone: IST });
 
     const override = listing.dateOverrides?.find((o) => o.date === dateStr);
     let slots = listing.slotsList || [];
@@ -63,6 +109,19 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
 
     const durationMin = input.durationMinutes || 60;
     baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
+
+    // Reject any slot that overlaps an existing non-cancelled booking.
+    const startTime = istTimeHHmm(bDate);
+    const startMin = timeToMinutes(startTime);
+    const bookedRanges = await getBookedRangesForDate(input.listingId, dateStr);
+    const clash = bookedRanges.find((r) =>
+      rangesOverlap(startMin, startMin + durationMin, timeToMinutes(r.startTime), timeToMinutes(r.endTime))
+    );
+    if (clash) {
+      throw ApiError.conflict(
+        `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
+      );
+    }
   } else if (input.priceTierId) {
     const tier = listing.priceTiers.find((t) => t.id === input.priceTierId);
     if (!tier) throw ApiError.badRequest("Selected price tier is not valid for this listing");
@@ -113,6 +172,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     email: input.email,
     sport: input.sport,
     dateTime: input.dateTime,
+    // Slot end as "HH:mm" (IST) so future availability checks know the real duration.
+    endTime:
+      listing.type === "Turf"
+        ? istTimeHHmm(new Date(new Date(input.dateTime).getTime() + (input.durationMinutes || 60) * 60_000))
+        : undefined,
     totalAmount: pricing.totalAmount,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,

@@ -9,13 +9,26 @@ export const createMyBooking = asyncHandler(async (req: Request, res: Response) 
   const customer = await CustomerModel.findById(req.auth!.sub);
   if (!customer) throw ApiError.notFound("Customer not found");
 
+  // Google/OTP signups can have no phone on file; without this check the Booking
+  // model rejects the missing required field with an unhelpful "Validation failed".
+  const phone = req.body.phone ?? customer.phone;
+  if (!phone) {
+    throw ApiError.badRequest("Please enter your mobile number to complete the booking.");
+  }
+
   const booking = await createBooking({
     ...req.body,
     customerId: customer._id.toString(),
     customerName: req.body.customerName ?? customer.name,
-    phone: req.body.phone ?? customer.phone,
+    phone,
     email: req.body.email ?? customer.email,
   });
+
+  // Remember the number so the customer doesn't have to type it again next time.
+  if (!customer.phone && req.body.phone) {
+    customer.phone = req.body.phone;
+    await customer.save().catch(() => undefined);
+  }
 
   sendSuccess(res, 201, booking, "Booking created");
 });
