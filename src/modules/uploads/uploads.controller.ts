@@ -5,7 +5,8 @@ import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { uploadImageBuffer } from "../../services/upload.service";
 
-const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB maximum limit
+// Must stay in sync with the "max 5 MB" copy shown in the upload UIs.
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 const upload = multer({
   storage: multer.memoryStorage(),
