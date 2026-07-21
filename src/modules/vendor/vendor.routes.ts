@@ -17,6 +17,7 @@ import vendorMembershipRoutes from "./vendor.membership.routes";
 import vendorProfileRoutes from "./vendor.profile.routes";
 import vendorStaffRoutes from "./vendor.staff.routes";
 import vendorMpinRoutes from "./vendor.mpin.routes";
+import vendorChallengesRoutes from "../challenges/vendor.challenges.routes";
 import uploadsRoutes from "../uploads/uploads.routes";
 
 const router = Router();
@@ -40,5 +41,6 @@ router.use("/food-dashboard", vendorFoodDashboardRoutes);
 router.use("/events-dashboard", vendorEventsDashboardRoutes);
 router.use("/coaches-dashboard", vendorCoachesDashboardRoutes);
 router.use("/uploads", uploadsRoutes);
+router.use("/challenges", vendorChallengesRoutes);
 
 export default router;

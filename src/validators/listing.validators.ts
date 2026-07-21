@@ -76,6 +76,16 @@ export const createListingSchema = z.object({
       })
     )
     .optional(),
+  technicalSpecs: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1),
+        value: z.string().trim().min(1),
+        icon: z.string().trim().min(1),
+        color: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const updateListingSchema = createListingSchema.partial();

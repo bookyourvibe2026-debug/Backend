@@ -55,6 +55,13 @@ export interface DateOverride {
   slots: TurfSlot[];
 }
 
+export interface TechnicalSpec {
+  label: string;
+  value: string;
+  icon: string;
+  color?: string;
+}
+
 export interface ListingDocument {
   _id: Types.ObjectId;
   slug?: string;
@@ -92,6 +99,7 @@ export interface ListingDocument {
   itinerary: ItineraryStop[];
   faqs: ListingFAQ[];
   tags: string[];
+  technicalSpecs?: TechnicalSpec[];
   priceTiers: PriceTier[];
   addOns: AddOn[];
   coupons: Coupon[];
@@ -181,6 +189,20 @@ const listingSchema = new Schema<ListingDocument>(
     slotsList: { type: [turfSlotSchema], default: [] },
     dailyRoutine: { type: Boolean, default: true },
     dateOverrides: { type: [dateOverrideSchema], default: [] },
+    technicalSpecs: {
+      type: [
+        new Schema<TechnicalSpec>(
+          {
+            label: { type: String, required: true },
+            value: { type: String, required: true },
+            icon: { type: String, required: true },
+            color: { type: String, default: "purple" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

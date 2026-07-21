@@ -18,7 +18,7 @@ export function createApp(): Express {
 
 /** Always-allowed origins — hardcoded so Vercel env-var parsing can never break them. */
 const ALLOWED_ORIGINS = Array.from(new Set([
-  "http://localhost:3000",
+  "http://localhost:3001",
   "https://bookyourvibe.in",
   "https://www.bookyourvibe.in",
   "https://frontend-wedc.vercel.app",

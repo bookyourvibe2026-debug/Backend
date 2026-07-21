@@ -3,6 +3,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { sendSuccess } from "../../utils/ApiResponse";
 import {
   acceptChallenge,
+  checkInChallengeForVendor,
   createChallenge,
   getChallengeByCode,
   listChallengePlayers,
@@ -33,4 +34,9 @@ export const postAcceptChallenge = asyncHandler(async (req: Request, res: Respon
 export const postRejectChallenge = asyncHandler(async (req: Request, res: Response) => {
   const challenge = await rejectChallenge(req.params.code!, req.auth!.sub);
   sendSuccess(res, 200, challenge, "Challenge rejected");
+});
+
+export const postCheckInChallenge = asyncHandler(async (req: Request, res: Response) => {
+  const { challenge, alreadyArrived } = await checkInChallengeForVendor(req.params.code!, req.vendorId!);
+  sendSuccess(res, 200, challenge, alreadyArrived ? "Already checked in" : "Checked in");
 });

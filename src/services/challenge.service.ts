@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { CustomerDocument, CustomerModel } from "../models/Customer.model";
-import { ChallengeDocument, ChallengeModel } from "../models/Challenge.model";
+import { ChallengeDocument, ChallengeModel, ChallengeTeamMember } from "../models/Challenge.model";
+import { ListingModel } from "../models/Listing.model";
 import { ApiError } from "../utils/ApiError";
 import { env } from "../config/env";
 
@@ -67,6 +68,9 @@ function buildChallengeResponse(
     },
     sport: doc.sport,
     venueName: doc.venueName,
+    venueId: doc.venueId?.toString(),
+    arrived: doc.arrived,
+    arrivedAt: doc.arrivedAt?.toISOString(),
     scheduleLabel: doc.scheduleLabel,
     scheduledAt: doc.scheduledAt?.toISOString(),
     playersCount: doc.playersCount,
@@ -75,6 +79,8 @@ function buildChallengeResponse(
     entryFee: doc.entryFee,
     stakeType: doc.stakeType,
     stakeText: doc.stakeText,
+    team1Members: doc.team1Members?.map((m) => ({ name: m.name, phone: m.phone, id: m.customerId?.toString() })),
+    team2Members: doc.team2Members?.map((m) => ({ name: m.name, phone: m.phone, id: m.customerId?.toString() })),
     inviteUrl,
     shareMessage,
     status: doc.status,
@@ -115,8 +121,11 @@ export async function createChallenge(
     opponentId?: string;
     opponentName?: string;
     opponentPhone?: string;
+    team1Members?: { name: string; phone?: string; customerId?: string }[];
+    team2Members?: { name: string; phone?: string; customerId?: string }[];
     sport: string;
     venueName: string;
+    venueId?: string;
     scheduleLabel: string;
     scheduledAt?: Date;
     playersCount: ChallengeDocument["playersCount"];
@@ -140,6 +149,13 @@ export async function createChallenge(
   const opponentName = opponent?.name ?? input.opponentName;
   if (!opponentName) throw ApiError.badRequest("Either opponentId or opponentName is required");
 
+  const toMemberDocs = (members?: { name: string; phone?: string; customerId?: string }[]): ChallengeTeamMember[] | undefined =>
+    members?.map((m) => ({
+      name: m.name,
+      phone: m.phone,
+      customerId: m.customerId ? new Types.ObjectId(m.customerId) : null,
+    }));
+
   const code = await uniqueCode();
   const doc = await ChallengeModel.create({
     code,
@@ -147,8 +163,11 @@ export async function createChallenge(
     opponentId: opponent?._id ?? null,
     opponentName,
     opponentPhone: input.opponentPhone,
+    team1Members: toMemberDocs(input.team1Members),
+    team2Members: toMemberDocs(input.team2Members),
     sport: input.sport,
     venueName: input.venueName,
+    venueId: input.venueId ? new Types.ObjectId(input.venueId) : null,
     scheduleLabel: input.scheduleLabel,
     scheduledAt: input.scheduledAt,
     playersCount: input.playersCount,
@@ -206,4 +225,33 @@ export async function rejectChallenge(code: string, customerId: string) {
     doc.opponentId ? CustomerModel.findById(doc.opponentId).select("name phone avatarUrl") : null,
   ]);
   return buildChallengeResponse(doc, challenger, opponent, DEFAULT_INVITE_BASE_URL);
+}
+
+/** Scanning the challenge's QR at the door — only the vendor who owns the chosen venue
+ * can verify it, and only if the venue was picked from real listings (not a free-text one). */
+export async function checkInChallengeForVendor(code: string, vendorId: string) {
+  const doc = await ChallengeModel.findOne({ code: code.toUpperCase() });
+  if (!doc) throw ApiError.notFound("Challenge not found");
+  if (!doc.venueId) throw ApiError.badRequest("This challenge isn't linked to a scannable venue");
+
+  const listing = await ListingModel.findById(doc.venueId).select("vendorId");
+  if (!listing || listing.vendorId?.toString() !== vendorId) {
+    throw ApiError.forbidden("This challenge isn't booked at your venue");
+  }
+  if (doc.status === "rejected" || doc.status === "cancelled") {
+    throw ApiError.conflict("This challenge was cancelled or declined");
+  }
+
+  const alreadyArrived = doc.arrived;
+  if (!alreadyArrived) {
+    doc.arrived = true;
+    doc.arrivedAt = new Date();
+    await doc.save();
+  }
+
+  const [challenger, opponent] = await Promise.all([
+    CustomerModel.findById(doc.challengerId).select("name phone avatarUrl"),
+    doc.opponentId ? CustomerModel.findById(doc.opponentId).select("name phone avatarUrl") : null,
+  ]);
+  return { challenge: buildChallengeResponse(doc, challenger, opponent, DEFAULT_INVITE_BASE_URL), alreadyArrived };
 }
