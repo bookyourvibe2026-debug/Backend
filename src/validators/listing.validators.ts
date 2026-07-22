@@ -88,7 +88,13 @@ export const createListingSchema = z.object({
     .optional(),
 });
 
-export const updateListingSchema = createListingSchema.partial();
+// A partial of the create schema, but with the `categories` min(1) rule relaxed.
+// Pricing / boost / block-slot saves round-trip the whole listing, and a turf may
+// have no sports configured yet — enforcing min(1) here made those unrelated
+// updates fail with a raw "categories: Array must contain at least 1 element(s)".
+export const updateListingSchema = createListingSchema.partial().extend({
+  categories: z.array(z.string()).optional(),
+});
 
 export const listingIdParamSchema = z.object({
   id: z.string().regex(/^[a-f\d]{24}$|^[a-z0-9-]+$/i, "Invalid listing id or slug"),
