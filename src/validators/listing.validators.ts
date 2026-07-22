@@ -4,7 +4,7 @@ const imageSchema = z.object({ id: z.string(), url: z.string().url(), label: z.s
 const faqSchema = z.object({ question: z.string().min(1), answer: z.string().min(1) });
 const itinerarySchema = z.object({ day: z.number().int().positive(), title: z.string().min(1), description: z.string() });
 const priceTierSchema = z.object({ id: z.string(), label: z.string().min(1), amount: z.number().nonnegative() });
-const addOnSchema = z.object({ id: z.string(), label: z.string().min(1), price: z.number().nonnegative() });
+const addOnSchema = z.object({ id: z.string(), label: z.string().min(1), price: z.number().nonnegative(), image: imageSchema.optional() });
 const couponSchema = z.object({ id: z.string(), code: z.string().min(2), discountPercent: z.number().min(0).max(100) });
 
 export const createListingSchema = z.object({

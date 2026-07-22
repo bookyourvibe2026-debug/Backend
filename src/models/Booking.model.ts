@@ -1,6 +1,6 @@
 import { Schema, model, Types } from "mongoose";
 
-export type BookingStatus = "Confirmed" | "Pending" | "Cancelled" | "Completed";
+export type BookingStatus = "Confirmed" | "Pending" | "Cancelled" | "Completed" | "Part Paid";
 export type PaymentMethod = "Cashfree (Online)" | "Cash (Offline)" | "UPI";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
@@ -22,6 +22,7 @@ export interface BookingDocument {
   dateTime: Date;
   endTime?: string;
   totalAmount: number;
+  paidAmount?: number;
   platformFee: number;
   taxes: number;
   affiliateAmount: number;
@@ -54,6 +55,7 @@ const bookingSchema = new Schema<BookingDocument>(
     /** Slot end as "HH:mm"; optional so existing bookings stay valid. */
     endTime: { type: String },
     totalAmount: { type: Number, required: true, min: 0 },
+    paidAmount: { type: Number },
     platformFee: { type: Number, required: true, min: 0, default: 0 },
     taxes: { type: Number, required: true, min: 0, default: 0 },
     affiliateAmount: { type: Number, required: true, min: 0, default: 0 },
@@ -61,7 +63,7 @@ const bookingSchema = new Schema<BookingDocument>(
     payment: { type: String, enum: ["Cashfree (Online)", "Cash (Offline)", "UPI"], required: true },
     paymentStatus: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
     paymentOrderId: { type: String },
-    status: { type: String, enum: ["Confirmed", "Pending", "Cancelled", "Completed"], default: "Pending" },
+    status: { type: String, enum: ["Confirmed", "Pending", "Cancelled", "Completed", "Part Paid"], default: "Pending" },
     isAffiliate: { type: Boolean, default: false },
     cancellationReason: { type: String },
     checkedIn: { type: Boolean, default: false },

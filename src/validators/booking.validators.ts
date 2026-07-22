@@ -34,17 +34,18 @@ export const createManualBookingSchema = z.object({
   dateTime: z.coerce.date(),
   endTime: z.string().trim().regex(/^\d{2}:\d{2}$/).optional(),
   totalAmount: z.coerce.number().positive(),
+  paidAmount: z.coerce.number().min(0).optional(),
   payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
-  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed"]).default("Confirmed"),
+  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed", "Part Paid"]).default("Confirmed"),
 });
 
 export const updateBookingStatusSchema = z.object({
-  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed"]),
+  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed", "Part Paid"]),
   cancellationReason: z.string().max(500).optional(),
 });
 
 export const bookingListQuerySchema = z.object({
-  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed"]).optional(),
+  status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed", "Part Paid"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(500).default(20),
 });

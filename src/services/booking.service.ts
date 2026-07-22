@@ -188,6 +188,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         ? istTimeHHmm(new Date(new Date(input.dateTime).getTime() + (input.durationMinutes || 60) * 60_000))
         : undefined,
     totalAmount: pricing.totalAmount,
+    paidAmount: pricing.totalAmount,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
     vendorEarning: pricing.vendorEarning,
@@ -208,6 +209,7 @@ export interface CreateManualBookingInput {
   dateTime: Date;
   endTime?: string;
   totalAmount: number;
+  paidAmount?: number;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   status: BookingDocument["status"];
 }
@@ -231,6 +233,7 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
     dateTime: input.dateTime,
     endTime: input.endTime,
     totalAmount: pricing.totalAmount,
+    paidAmount: input.paidAmount !== undefined ? input.paidAmount : pricing.totalAmount,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
     vendorEarning: pricing.vendorEarning,

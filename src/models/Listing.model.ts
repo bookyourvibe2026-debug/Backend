@@ -31,6 +31,7 @@ export interface AddOn {
   id: string;
   label: string;
   price: number;
+  image?: ListingImage;
 }
 
 export interface Coupon {
@@ -118,7 +119,7 @@ const listingImageSchema = new Schema<ListingImage>({ id: String, url: String, l
 const faqSchema = new Schema<ListingFAQ>({ question: String, answer: String }, { _id: false });
 const itinerarySchema = new Schema<ItineraryStop>({ day: Number, title: String, description: String }, { _id: false });
 const priceTierSchema = new Schema<PriceTier>({ id: String, label: String, amount: Number }, { _id: false });
-const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number }, { _id: false });
+const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number, image: { type: listingImageSchema, required: false } }, { _id: false });
 const couponSchema = new Schema<Coupon>({ id: String, code: String, discountPercent: Number }, { _id: false });
 
 const turfSlotSchema = new Schema<TurfSlot>(
