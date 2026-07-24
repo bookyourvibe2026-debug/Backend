@@ -53,6 +53,7 @@ export const resetPasswordSchema = z.object({
 export const updateCustomerProfileSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   avatarUrl: z.string().url().optional(),
+  phone: phoneSchema.optional(),
 });
 
 export const vendorRegisterSchema = z.object({

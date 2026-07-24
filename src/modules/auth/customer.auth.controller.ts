@@ -227,11 +227,22 @@ export const getCurrentCustomer = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateMyProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { name, avatarUrl } = req.body;
+  const { name, avatarUrl, phone } = req.body;
+
+  if (phone) {
+    const existing = await CustomerModel.findOne({ phone, _id: { $ne: req.auth?.sub } });
+    if (existing) {
+      throw ApiError.badRequest("Phone number is already registered");
+    }
+  }
 
   const customer = await CustomerModel.findByIdAndUpdate(
     req.auth?.sub,
-    { ...(name !== undefined && { name }), ...(avatarUrl !== undefined && { avatarUrl }) },
+    {
+      ...(name !== undefined && { name }),
+      ...(avatarUrl !== undefined && { avatarUrl }),
+      ...(phone !== undefined && { phone }),
+    },
     { new: true }
   );
   if (!customer) throw ApiError.notFound("Customer not found");
