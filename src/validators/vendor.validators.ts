@@ -94,6 +94,11 @@ export const updateVendorProfileSchema = z.object({
     .optional(),
 });
 
+/** Verticals a vendor can switch on for themselves later (add-only — see the controller). */
+export const addVendorVerticalsSchema = z.object({
+  verticals: z.array(z.enum(["turf", "events", "food", "coaches"])).min(1).max(4),
+});
+
 export const createMembershipSchema = z.object({
   listingId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id").optional(),
   name: z.string().trim().min(2).max(120),
