@@ -18,6 +18,9 @@ export const createBookingSchema = z.object({
   payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
   sport: z.string().trim().max(60).optional(),
   durationMinutes: z.coerce.number().int().positive().optional(),
+  /** Pay only part of the price now — must clear a 20% floor, enforced once the
+   * real total is known (server-computed pricing, not the client's guess of it). */
+  paidAmount: z.coerce.number().positive().optional(),
 });
 
 export const orderIdParamSchema = z.object({

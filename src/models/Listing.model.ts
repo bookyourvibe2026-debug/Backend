@@ -63,6 +63,12 @@ export interface TechnicalSpec {
   color?: string;
 }
 
+/** Per-sport player cap on a Turf/Game listing — e.g. Football allows 14, Badminton allows 4. */
+export interface SportCapacity {
+  category: string;
+  maxPlayers: number;
+}
+
 export interface ListingDocument {
   _id: Types.ObjectId;
   slug?: string;
@@ -70,6 +76,8 @@ export interface ListingDocument {
   type: ListingType;
   categories: string[];
   subCategories: string[];
+  /** Max players allowed per selected sport (Turf/Game listings) — one entry per category. */
+  sportCapacities: SportCapacity[];
   price: number;
   /** Ticket cap for type: "Event" listings — unused for Turf/Game. */
   capacity?: number;
@@ -121,6 +129,10 @@ const itinerarySchema = new Schema<ItineraryStop>({ day: Number, title: String, 
 const priceTierSchema = new Schema<PriceTier>({ id: String, label: String, amount: Number }, { _id: false });
 const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number, image: { type: listingImageSchema, required: false } }, { _id: false });
 const couponSchema = new Schema<Coupon>({ id: String, code: String, discountPercent: Number }, { _id: false });
+const sportCapacitySchema = new Schema<SportCapacity>(
+  { category: { type: String, required: true }, maxPlayers: { type: Number, required: true, min: 1 } },
+  { _id: false }
+);
 
 const turfSlotSchema = new Schema<TurfSlot>(
   {
@@ -151,6 +163,7 @@ const listingSchema = new Schema<ListingDocument>(
     type: { type: String, enum: ["Turf", "Game", "Event"], required: true },
     categories: { type: [String], default: [], index: true },
     subCategories: { type: [String], default: [] },
+    sportCapacities: { type: [sportCapacitySchema], default: [] },
     price: { type: Number, required: true, min: 0 },
     capacity: { type: Number, min: 1 },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },

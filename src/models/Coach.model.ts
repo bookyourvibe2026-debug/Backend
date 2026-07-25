@@ -35,6 +35,11 @@ export interface CoachBatch {
   priceYearly: number;
   demoAvailable: boolean;
   active: boolean;
+  /** How the vendor actually quotes this batch's price to players — informational,
+   * shown on the academy card. Enrolment itself is still always demo/monthly/yearly. */
+  pricingMode?: "session" | "day" | "month";
+  pricePerSession?: number;
+  pricePerDay?: number;
 }
 
 export interface CoachLocation {
@@ -48,6 +53,10 @@ export interface CoachLocation {
 export interface CoachDocument {
   _id: Types.ObjectId;
   vendorId: Types.ObjectId;
+  /** Set when this academy was added from within a specific turf's listing flow —
+   * lets the turf's detail page and the vendor's Bookings page surface it as
+   * "the academy at this venue" rather than a standalone coach profile. */
+  turfListingId?: Types.ObjectId | null;
   slug?: string;
   name: string;
   /** Primary sport — kept in sync with categories[0] for back-compat with legacy filters. */
@@ -106,6 +115,9 @@ const batchSchema = new Schema<CoachBatch>(
     priceYearly: { type: Number, required: true, min: 0 },
     demoAvailable: { type: Boolean, default: false },
     active: { type: Boolean, default: true },
+    pricingMode: { type: String, enum: ["session", "day", "month"] },
+    pricePerSession: { type: Number, min: 0 },
+    pricePerDay: { type: Number, min: 0 },
   },
   { _id: false }
 );
@@ -124,6 +136,7 @@ const locationSchema = new Schema<CoachLocation>(
 const coachSchema = new Schema<CoachDocument>(
   {
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true, index: true },
+    turfListingId: { type: Schema.Types.ObjectId, ref: "Listing", default: null, index: true },
     slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     category: { type: String, required: true },

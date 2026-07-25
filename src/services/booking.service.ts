@@ -34,7 +34,12 @@ export interface CreateBookingInput {
   customerId?: string;
   sport?: string;
   durationMinutes?: number;
+  /** Pay only part of the total now; the rest is settled at the venue. */
+  paidAmount?: number;
 }
+
+/** A partial payment must clear this floor of the real (server-computed) total. */
+const MIN_PARTIAL_PAYMENT_PERCENT = 20;
 
 /* ── Slot availability ──
  * Bookings store their slot start as a UTC instant plus an optional "HH:mm" end;
@@ -98,21 +103,44 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       slots = override.slots || [];
     }
 
+    const startTime = istTimeHHmm(bDate);
+    const startMin = timeToMinutes(startTime);
+    const durationMin = input.durationMinutes || 60;
+    const endMin = startMin + durationMin;
+
+    // Price is whatever slot(s) this booking actually overlaps, pro-rated by minutes
+    // covered in each — never a flat whole-day average. A venue with a cheaper morning
+    // rate and a pricier evening rate (or any per-slot/dynamic pricing) must charge the
+    // rate for the time actually booked, and this must match what the customer was
+    // shown at checkout (booking-flow.tsx's own generatedSlots uses this same overlap-
+    // weighted hourly-rate method).
     let baseHourlyRate = listing.price || 1000;
     if (slots.length > 0) {
-      let sum = 0;
-      slots.forEach((s) => {
-        sum += s.price;
-      });
-      baseHourlyRate = Math.round(sum / slots.length);
+      let coveredMin = 0;
+      let weightedSum = 0;
+      for (const s of slots) {
+        const sStart = timeToMinutes(s.startTime);
+        let sEnd = timeToMinutes(s.endTime);
+        if (sEnd <= sStart) sEnd += 1440;
+        const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
+        if (overlap > 0) {
+          coveredMin += overlap;
+          weightedSum += overlap * s.price;
+        }
+      }
+      if (coveredMin > 0) {
+        baseHourlyRate = Math.round(weightedSum / coveredMin);
+      } else {
+        // Nothing configured actually covers this window — fall back to the day's
+        // average rather than hard-rejecting a booking outside the configured slots.
+        const sum = slots.reduce((acc, s) => acc + s.price, 0);
+        baseHourlyRate = Math.round(sum / slots.length);
+      }
     }
 
-    const durationMin = input.durationMinutes || 60;
     baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
 
     // Reject any slot that overlaps an existing non-cancelled booking.
-    const startTime = istTimeHHmm(bDate);
-    const startMin = timeToMinutes(startTime);
     const bookedRanges = await getBookedRangesForDate(input.listingId, dateStr);
     const clash = bookedRanges.find((r) =>
       rangesOverlap(startMin, startMin + durationMin, timeToMinutes(r.startTime), timeToMinutes(r.endTime))
@@ -156,11 +184,23 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   const pricing = computePricing(baseAmount, discountPercent);
   const orderId = generateOrderId();
 
+  // Partial payment: must clear the 20% floor of the *real* total — computed here,
+  // server-side, never trusted from the client (which only saw an estimate).
+  let chargeNow = pricing.totalAmount;
+  if (input.paidAmount !== undefined && input.paidAmount < pricing.totalAmount) {
+    const minPartial = Math.ceil((pricing.totalAmount * MIN_PARTIAL_PAYMENT_PERCENT) / 100);
+    if (input.paidAmount < minPartial) {
+      throw ApiError.badRequest(`Partial payment must be at least ₹${minPartial} (${MIN_PARTIAL_PAYMENT_PERCENT}% of ₹${pricing.totalAmount}).`);
+    }
+    chargeNow = Math.round(input.paidAmount);
+  }
+  const isPartial = chargeNow < pricing.totalAmount;
+
   let paymentOrderId: string | undefined;
   if (input.payment === "Cashfree (Online)") {
     const order = await paymentProvider.createOrder({
       orderId,
-      amount: pricing.totalAmount,
+      amount: chargeNow,
       customerName: input.customerName,
       customerEmail: input.email,
       customerPhone: input.phone,
@@ -188,14 +228,14 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         ? istTimeHHmm(new Date(new Date(input.dateTime).getTime() + (input.durationMinutes || 60) * 60_000))
         : undefined,
     totalAmount: pricing.totalAmount,
-    paidAmount: pricing.totalAmount,
+    paidAmount: chargeNow,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
     vendorEarning: pricing.vendorEarning,
     payment: input.payment,
     paymentOrderId,
     paymentStatus: input.payment === "Cashfree (Online)" ? "pending" : "pending",
-    status: "Pending",
+    status: isPartial ? "Part Paid" : "Pending",
   });
 }
 

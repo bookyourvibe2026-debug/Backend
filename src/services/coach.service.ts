@@ -1,6 +1,7 @@
 import { FilterQuery, PipelineStage, Types } from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { CoachBatch, CoachDocument, CoachModel, CoachWeeklyDay } from "../models/Coach.model";
+import { VendorModel } from "../models/Vendor.model";
 import {
   CoachSubscriptionDocument,
   CoachSubscriptionModel,
@@ -9,6 +10,7 @@ import {
 import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
 import { paymentProvider } from "./payment/payment.service";
+import { getListingScopedToVendor } from "./listing.service";
 
 /* --------------------------------- Coach CRUD --------------------------------- */
 
@@ -36,6 +38,8 @@ export interface CreateCoachInput {
   gallery?: string[];
   status?: "Active" | "Inactive";
   location?: CoachLocationInput;
+  /** Set when this academy was added from within a turf's "Add Turf" flow. */
+  turfListingId?: string;
   /** Slots/batches created together with the coach in a single save. */
   batches?: InlineBatchInput[];
 }
@@ -44,6 +48,21 @@ export async function createCoach(vendorId: string, input: CreateCoachInput) {
   const { batches, ...rest } = input;
   const withIds = (batches ?? []).map((b) => ({ id: uuidv4(), ...b }));
   return CoachModel.create({ ...rest, vendorId, batches: withIds });
+}
+
+/**
+ * Lets a Turf vendor add an academy at their own venue without having separately
+ * registered for the Coaches vertical — that's the whole point of offering it inline
+ * in the "Add Turf" flow. Ownership of the turf is verified server-side (never trust
+ * a client-supplied listing id), and adding the academy implicitly grants the vendor
+ * the Coaches vertical so they can keep managing it afterwards (extra batches, leaves,
+ * availability, students...) through the normal Coaches module instead of hitting a 403.
+ */
+export async function createAcademyForTurf(vendorId: string, turfListingId: string, input: CreateCoachInput) {
+  const listing = await getListingScopedToVendor(turfListingId, vendorId);
+  const coach = await createCoach(vendorId, { ...input, turfListingId: listing._id.toString() });
+  await VendorModel.updateOne({ _id: vendorId }, { $addToSet: { verticals: "coaches" } });
+  return coach;
 }
 
 export async function getCoachForVendor(vendorId: string, coachId: string) {
@@ -157,6 +176,7 @@ export async function removeLeave(vendorId: string, coachId: string, isoDate: st
 export interface PublicCoachFilters {
   category?: string;
   vendorId?: string;
+  turfListingId?: string;
   city?: string;
   lat?: number;
   lng?: number;
@@ -175,6 +195,7 @@ export async function listPublicCoaches(filters: PublicCoachFilters) {
   // Match either the legacy primary category or any sport in the multi-sport list.
   if (filters.category) match.$or = [{ category: filters.category }, { categories: filters.category }];
   if (filters.vendorId) match.vendorId = new Types.ObjectId(filters.vendorId);
+  if (filters.turfListingId) match.turfListingId = new Types.ObjectId(filters.turfListingId);
   if (filters.city) match["location.city"] = new RegExp(`^${escapeRegex(filters.city)}$`, "i");
 
   const skip = (filters.page - 1) * filters.limit;

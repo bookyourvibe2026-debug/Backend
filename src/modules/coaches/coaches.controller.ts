@@ -4,9 +4,10 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { getPublicCoachById, listPublicCoaches } from "../../services/coach.service";
 
 export const browseCoaches = asyncHandler(async (req: Request, res: Response) => {
-  const { category, vendorId, city, lat, lng, radiusKm, page, limit } = req.query as unknown as {
+  const { category, vendorId, turfListingId, city, lat, lng, radiusKm, page, limit } = req.query as unknown as {
     category?: string;
     vendorId?: string;
+    turfListingId?: string;
     city?: string;
     lat?: number;
     lng?: number;
@@ -15,7 +16,7 @@ export const browseCoaches = asyncHandler(async (req: Request, res: Response) =>
     limit: number;
   };
 
-  const result = await listPublicCoaches({ category, vendorId, city, lat, lng, radiusKm, page, limit });
+  const result = await listPublicCoaches({ category, vendorId, turfListingId, city, lat, lng, radiusKm, page, limit });
   sendSuccess(res, 200, result);
 });
 

@@ -6,6 +6,7 @@ const itinerarySchema = z.object({ day: z.number().int().positive(), title: z.st
 const priceTierSchema = z.object({ id: z.string(), label: z.string().min(1), amount: z.number().nonnegative() });
 const addOnSchema = z.object({ id: z.string(), label: z.string().min(1), price: z.number().nonnegative(), image: imageSchema.optional() });
 const couponSchema = z.object({ id: z.string(), code: z.string().min(2), discountPercent: z.number().min(0).max(100) });
+const sportCapacitySchema = z.object({ category: z.string().min(1), maxPlayers: z.number().int().positive() });
 
 export const createListingSchema = z.object({
   title: z.string().trim().min(2).max(200),
@@ -13,6 +14,8 @@ export const createListingSchema = z.object({
   slug: z.string().optional(),
   categories: z.array(z.string()).min(1),
   subCategories: z.array(z.string()).optional(),
+  /** Max players allowed per selected sport — Turf/Game listings only. */
+  sportCapacities: z.array(sportCapacitySchema).optional(),
   price: z.number().nonnegative(),
   capacity: z.number().int().positive().optional(),
   status: z.enum(["Active", "Inactive"]).optional(),

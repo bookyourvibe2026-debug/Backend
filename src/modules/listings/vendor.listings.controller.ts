@@ -8,6 +8,7 @@ import {
   listVendorListings,
   updateListingScopedToVendor,
 } from "../../services/listing.service";
+import { createAcademyForTurf } from "../../services/coach.service";
 
 export const createVendorListing = asyncHandler(async (req: Request, res: Response) => {
   const listing = await createListingForVendor(req.vendorId!, req.body.ownerName, req.body);
@@ -32,4 +33,11 @@ export const updateVendorListing = asyncHandler(async (req: Request, res: Respon
 export const deleteVendorListing = asyncHandler(async (req: Request, res: Response) => {
   await deleteListingScopedToVendor(req.params.id!, req.vendorId!);
   sendSuccess(res, 200, null, "Listing deleted");
+});
+
+/** Add an academy at this turf — available to any Turf vendor, not gated behind the
+ * separate Coaches vertical (that gate exists for the standalone Coaches module). */
+export const addAcademyToVendorListing = asyncHandler(async (req: Request, res: Response) => {
+  const coach = await createAcademyForTurf(req.vendorId!, req.params.id!, req.body);
+  sendSuccess(res, 201, coach, "Academy added");
 });

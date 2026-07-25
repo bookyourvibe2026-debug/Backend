@@ -25,6 +25,9 @@ const inlineBatchSchema = z.object({
   priceYearly: z.number().nonnegative(),
   demoAvailable: z.boolean().optional(),
   active: z.boolean().optional(),
+  pricingMode: z.enum(["session", "day", "month"]).optional(),
+  pricePerSession: z.number().nonnegative().optional(),
+  pricePerDay: z.number().nonnegative().optional(),
 });
 
 export const createCoachSchema = z.object({
@@ -41,6 +44,8 @@ export const createCoachSchema = z.object({
   gallery: z.array(z.string().url()).max(30).optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
   location: locationSchema.optional(),
+  /** Set when this academy is being added from within a turf's "Add Turf" flow. */
+  turfListingId: objectId.optional(),
   /** Slots/batches can be created inline with the coach in one save. */
   batches: z.array(inlineBatchSchema).max(30).optional(),
 });
@@ -80,6 +85,9 @@ const batchBodySchema = z.object({
   priceYearly: z.number().nonnegative(),
   demoAvailable: z.boolean().optional(),
   active: z.boolean().optional(),
+  pricingMode: z.enum(["session", "day", "month"]).optional(),
+  pricePerSession: z.number().nonnegative().optional(),
+  pricePerDay: z.number().nonnegative().optional(),
 });
 
 export const createBatchSchema = batchBodySchema;
@@ -99,6 +107,7 @@ export const leaveDateParamSchema = z.object({
 export const publicCoachQuerySchema = z.object({
   category: z.string().optional(),
   vendorId: objectId.optional(),
+  turfListingId: objectId.optional(),
   city: z.string().optional(),
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
