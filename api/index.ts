@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { configureNetwork } from "../src/config/network";
 
 type NodeHandler = (req: IncomingMessage, res: ServerResponse) => void;
+
+// Safe to run at module scope despite the lazy-loading rule below: network.ts
+// only touches node:dns and node:net, so it cannot throw on a misconfigured env.
+configureNetwork();
 
 // The Express app and DB connection are loaded lazily (inside the handler) so
 // that a misconfigured env or an unreachable database can NEVER crash the whole

@@ -2,8 +2,11 @@ import { createApp } from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/db";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
+import { configureNetwork } from "./config/network";
 
 async function main() {
+  configureNetwork();
+
   await connectDatabase();
 
   const app = createApp();
