@@ -34,12 +34,7 @@ export interface CreateBookingInput {
   customerId?: string;
   sport?: string;
   durationMinutes?: number;
-  /** Pay only part of the total now; the rest is settled at the venue. */
-  paidAmount?: number;
 }
-
-/** A partial payment must clear this floor of the real (server-computed) total. */
-const MIN_PARTIAL_PAYMENT_PERCENT = 20;
 
 /* ── Slot availability ──
  * Bookings store their slot start as a UTC instant plus an optional "HH:mm" end;
@@ -91,6 +86,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   if (!listing) throw ApiError.notFound("Listing not found or unavailable");
 
   let baseAmount = listing.price;
+  const selectedPriceTier = input.priceTierId ? listing.priceTiers.find((t) => t.id === input.priceTierId) : undefined;
+  if (input.priceTierId && !selectedPriceTier) {
+    throw ApiError.badRequest("Selected price tier is not valid for this listing");
+  }
+
   if (listing.type === "Turf") {
     const bDate = new Date(input.dateTime);
     // IST calendar date — toISOString() would shift slots before 5:30 AM to the previous day.
@@ -160,10 +160,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         `This time is unavailable — the venue has blocked ${blockedClash.startTime} - ${blockedClash.endTime}.`
       );
     }
-  } else if (input.priceTierId) {
-    const tier = listing.priceTiers.find((t) => t.id === input.priceTierId);
-    if (!tier) throw ApiError.badRequest("Selected price tier is not valid for this listing");
-    baseAmount = tier.amount;
+    if (selectedPriceTier) {
+      baseAmount = selectedPriceTier.amount;
+    }
+  } else if (selectedPriceTier) {
+    baseAmount = selectedPriceTier.amount;
   }
 
   if (input.addOnIds?.length) {
@@ -183,18 +184,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
 
   const pricing = computePricing(baseAmount, discountPercent);
   const orderId = generateOrderId();
-
-  // Partial payment: must clear the 20% floor of the *real* total — computed here,
-  // server-side, never trusted from the client (which only saw an estimate).
-  let chargeNow = pricing.totalAmount;
-  if (input.paidAmount !== undefined && input.paidAmount < pricing.totalAmount) {
-    const minPartial = Math.ceil((pricing.totalAmount * MIN_PARTIAL_PAYMENT_PERCENT) / 100);
-    if (input.paidAmount < minPartial) {
-      throw ApiError.badRequest(`Partial payment must be at least ₹${minPartial} (${MIN_PARTIAL_PAYMENT_PERCENT}% of ₹${pricing.totalAmount}).`);
-    }
-    chargeNow = Math.round(input.paidAmount);
-  }
-  const isPartial = chargeNow < pricing.totalAmount;
+  const chargeNow = pricing.totalAmount;
 
   let paymentOrderId: string | undefined;
   if (input.payment === "Cashfree (Online)") {
@@ -235,7 +225,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     payment: input.payment,
     paymentOrderId,
     paymentStatus: input.payment === "Cashfree (Online)" ? "pending" : "pending",
-    status: isPartial ? "Part Paid" : "Pending",
+    status: "Pending",
   });
 }
 

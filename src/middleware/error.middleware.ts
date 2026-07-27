@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from "express";
-import { MongoServerError } from "mongodb";
 import mongoose from "mongoose";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -47,6 +46,11 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   });
 }
 
-function isMongoDuplicateKeyError(err: unknown): err is MongoServerError & { keyValue: Record<string, unknown> } {
+// Reached through mongoose's re-export rather than importing "mongodb" directly:
+// the driver is only a transitive dep, and declaring it separately risks a second
+// copy at a different version than the one mongoose actually throws from.
+function isMongoDuplicateKeyError(
+  err: unknown
+): err is mongoose.mongo.MongoServerError & { keyValue: Record<string, unknown> } {
   return typeof err === "object" && err !== null && (err as { code?: number }).code === 11000;
 }

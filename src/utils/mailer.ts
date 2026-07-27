@@ -15,6 +15,7 @@ function getTransporter(): Transporter {
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
+      name: "bookyourvibe.in",
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
       // Many hosts have broken/filtered outbound IPv6 routes to Gmail's SMTP servers, which
       // corrupts the TLS handshake ("wrong version number"). Force IPv4 for the raw socket.
