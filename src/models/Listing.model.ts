@@ -69,6 +69,43 @@ export interface SportCapacity {
   maxPlayers: number;
 }
 
+/**
+ * One physically bookable unit inside a venue — "Court 1", "Turf A", "Synthetic Court".
+ * A listing with N courts can sell the same time slot N times over; without courts the
+ * whole venue is a single unit and one booking blocks the entire time range.
+ */
+export interface Court {
+  id: string;
+  name: string;
+  /** Sports this court can host. Empty means every sport the listing offers. */
+  sports: string[];
+  /** Replaces the time slot's hourly rate on this court. Undefined = inherit the slot price. */
+  priceOverride?: number;
+  /** Inactive courts stay on the listing (so past bookings still resolve) but cannot be booked. */
+  active: boolean;
+}
+
+/**
+ * Last Min Boost — a standing rule that discounts specific slots only inside a short
+ * window before they start, to fill them at the last minute.
+ *
+ * The rule is keyed by slot start time rather than by date, so it applies every day:
+ * a slot only carries the discount while it is still unbooked AND the clock is inside
+ * `triggerMins` of its start. Nothing is written into slot prices — the discount is
+ * derived on read, which is what makes the trigger window mean anything.
+ */
+export interface LastMinBoost {
+  enabled: boolean;
+  /** Sport label the boost applies to, matching what a booking sends as `sport`. */
+  game: string;
+  /** Slot start times in "HH:mm" that the vendor opted into. */
+  slotStarts: string[];
+  /** 10-30. Enforced by the validator and clamped again on read. */
+  discountPct: number;
+  /** How many minutes before the slot the deal goes live. */
+  triggerMins: number;
+}
+
 export interface ListingDocument {
   _id: Types.ObjectId;
   slug?: string;
@@ -78,6 +115,8 @@ export interface ListingDocument {
   subCategories: string[];
   /** Max players allowed per selected sport (Turf/Game listings) — one entry per category. */
   sportCapacities: SportCapacity[];
+  /** Bookable units within this venue. Empty = the venue itself is the only unit. */
+  courts: Court[];
   price: number;
   /** Ticket cap for type: "Event" listings — unused for Turf/Game. */
   capacity?: number;
@@ -119,6 +158,8 @@ export interface ListingDocument {
   slotsList: TurfSlot[];
   dailyRoutine: boolean;
   dateOverrides: DateOverride[];
+  /** Absent on listings the vendor has never configured a boost for. */
+  lastMinBoost?: LastMinBoost;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -134,6 +175,17 @@ const sportCapacitySchema = new Schema<SportCapacity>(
   { _id: false }
 );
 
+const courtSchema = new Schema<Court>(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true, trim: true, maxlength: 80 },
+    sports: { type: [String], default: [] },
+    priceOverride: { type: Number, min: 0 },
+    active: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const turfSlotSchema = new Schema<TurfSlot>(
   {
     startTime: { type: String, required: true },
@@ -142,6 +194,17 @@ const turfSlotSchema = new Schema<TurfSlot>(
     price: { type: Number, required: true, min: 0 },
     blocked: { type: Boolean, default: false },
     blockedReason: { type: String },
+  },
+  { _id: false }
+);
+
+const lastMinBoostSchema = new Schema<LastMinBoost>(
+  {
+    enabled: { type: Boolean, default: false },
+    game: { type: String, default: "" },
+    slotStarts: { type: [String], default: [] },
+    discountPct: { type: Number, min: 10, max: 30, default: 10 },
+    triggerMins: { type: Number, min: 1, max: 240, default: 10 },
   },
   { _id: false }
 );
@@ -164,6 +227,7 @@ const listingSchema = new Schema<ListingDocument>(
     categories: { type: [String], default: [], index: true },
     subCategories: { type: [String], default: [] },
     sportCapacities: { type: [sportCapacitySchema], default: [] },
+    courts: { type: [courtSchema], default: [] },
     price: { type: Number, required: true, min: 0 },
     capacity: { type: Number, min: 1 },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
@@ -203,6 +267,7 @@ const listingSchema = new Schema<ListingDocument>(
     slotsList: { type: [turfSlotSchema], default: [] },
     dailyRoutine: { type: Boolean, default: true },
     dateOverrides: { type: [dateOverrideSchema], default: [] },
+    lastMinBoost: { type: lastMinBoostSchema, required: false },
     technicalSpecs: {
       type: [
         new Schema<TechnicalSpec>(

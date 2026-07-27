@@ -7,6 +7,24 @@ const priceTierSchema = z.object({ id: z.string(), label: z.string().min(1), amo
 const addOnSchema = z.object({ id: z.string(), label: z.string().min(1), price: z.number().nonnegative(), image: imageSchema.optional() });
 const couponSchema = z.object({ id: z.string(), code: z.string().min(2), discountPercent: z.number().min(0).max(100) });
 const sportCapacitySchema = z.object({ category: z.string().min(1), maxPlayers: z.number().int().positive() });
+const courtSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1).max(80),
+  /** Empty = the court hosts every sport the listing offers. */
+  sports: z.array(z.string()).default([]),
+  /** Null clears an override back to "inherit the slot price". */
+  priceOverride: z.number().nonnegative().nullable().optional(),
+  active: z.boolean().default(true),
+});
+
+/** Last Min Boost. The 10-30% band is the product rule, enforced here rather than in the UI alone. */
+const lastMinBoostSchema = z.object({
+  enabled: z.boolean(),
+  game: z.string().trim().max(60),
+  slotStarts: z.array(z.string().regex(/^\d{2}:\d{2}$/, "Slot start must be HH:mm")).max(48),
+  discountPct: z.number().int().min(10, "Discount cannot be below 10%").max(30, "Discount cannot be above 30%"),
+  triggerMins: z.number().int().min(1).max(240),
+});
 
 export const createListingSchema = z.object({
   title: z.string().trim().min(2).max(200),
@@ -16,6 +34,8 @@ export const createListingSchema = z.object({
   subCategories: z.array(z.string()).optional(),
   /** Max players allowed per selected sport — Turf/Game listings only. */
   sportCapacities: z.array(sportCapacitySchema).optional(),
+  /** Bookable units in the venue — court 1, court 2... Empty = the venue is a single unit. */
+  courts: z.array(courtSchema).max(50).optional(),
   price: z.number().nonnegative(),
   capacity: z.number().int().positive().optional(),
   status: z.enum(["Active", "Inactive"]).optional(),
@@ -61,6 +81,7 @@ export const createListingSchema = z.object({
     )
     .optional(),
   dailyRoutine: z.boolean().optional(),
+  lastMinBoost: lastMinBoostSchema.optional(),
   dateOverrides: z
     .array(
       z.object({

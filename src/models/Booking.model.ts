@@ -15,6 +15,10 @@ export interface BookingDocument {
   email?: string;
   /** Which sport the slot was booked for (vendor-entered on manual bookings). */
   sport?: string;
+  /** Which court on the listing was booked. Absent on bookings taken before courts existed. */
+  courtId?: string;
+  /** Court name captured at booking time, so renaming a court doesn't rewrite history. */
+  courtName?: string;
   /** How many players are coming (vendor-entered on manual bookings). */
   numberOfPlayers?: number;
   /** Whether food & beverage is included with this booking. */
@@ -49,6 +53,8 @@ const bookingSchema = new Schema<BookingDocument>(
     phone: { type: String, required: true },
     email: { type: String },
     sport: { type: String },
+    courtId: { type: String },
+    courtName: { type: String },
     numberOfPlayers: { type: Number, min: 1, max: 200 },
     foodIncluded: { type: Boolean },
     dateTime: { type: Date, required: true },

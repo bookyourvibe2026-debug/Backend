@@ -56,6 +56,40 @@ export async function connectDatabase(): Promise<void> {
     logger.error({ err }, "Error running coach migrations");
   }
 
+  // Courts migration: a Turf listing used to be a single bookable unit, so one
+  // booking blocked the whole venue for that time range. Give every court-less
+  // Turf exactly one default court and stamp its existing bookings with it —
+  // that reproduces the old behaviour byte for byte, and the vendor can then add
+  // court 2, 3... to start selling the same slot more than once.
+  try {
+    const { ListingModel } = await import("../models/Listing.model");
+    const { BookingModel } = await import("../models/Booking.model");
+
+    const courtless = await ListingModel.find({
+      type: "Turf",
+      $or: [{ courts: { $exists: false } }, { courts: { $size: 0 } }],
+    }).select("_id");
+
+    if (courtless.length > 0) {
+      logger.info(`Found ${courtless.length} turf listings requiring the default-court migration.`);
+      for (const listing of courtless) {
+        const courtId = `court-${listing._id.toString().slice(-8)}`;
+        const courtName = "Main Court";
+        await ListingModel.updateOne(
+          { _id: listing._id },
+          { $set: { courts: [{ id: courtId, name: courtName, sports: [], active: true }] } }
+        );
+        await BookingModel.updateMany(
+          { listingId: listing._id, courtId: { $exists: false } },
+          { $set: { courtId, courtName } }
+        );
+      }
+      logger.info("Default-court migration completed successfully.");
+    }
+  } catch (err) {
+    logger.error({ err }, "Error running court migrations");
+  }
+
   // Food multi-outlet migration: every food vendor gets a default FoodOutlet
   // (from their Vendor profile), and legacy MenuItems/FoodOrders that predate
   // outlets get stamped with it. Idempotent — only touches docs missing outletId.

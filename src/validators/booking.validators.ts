@@ -17,6 +17,8 @@ export const createBookingSchema = z.object({
   email: z.string().trim().toLowerCase().email().optional(),
   payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
   sport: z.string().trim().max(60).optional(),
+  /** Omitted = let the backend auto-assign the first free court. */
+  courtId: z.string().trim().max(60).optional(),
   durationMinutes: z.coerce.number().int().positive().optional(),
 });
 
@@ -29,6 +31,7 @@ export const createManualBookingSchema = z.object({
   customerName: z.string().trim().min(2).max(120),
   phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
   sport: z.string().trim().max(60).optional(),
+  courtId: z.string().trim().max(60).optional(),
   numberOfPlayers: z.coerce.number().int().min(1).max(200).optional(),
   foodIncluded: z.boolean().optional(),
   dateTime: z.coerce.date(),
