@@ -26,6 +26,10 @@ export const orderIdParamSchema = z.object({
   orderId: z.string().min(1),
 });
 
+export const confirmPaymentSchema = z.object({
+  paymentId: z.string().optional(),
+});
+
 export const createManualBookingSchema = z.object({
   listingId: objectId,
   customerName: z.string().trim().min(2).max(120),

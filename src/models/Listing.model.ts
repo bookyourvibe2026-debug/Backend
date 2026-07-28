@@ -106,6 +106,12 @@ export interface LastMinBoost {
   triggerMins: number;
 }
 
+export interface PartialPaymentConfig {
+  enabled: boolean;
+  type: "percentage" | "fixed";
+  value: number;
+}
+
 export interface ListingDocument {
   _id: Types.ObjectId;
   slug?: string;
@@ -160,6 +166,8 @@ export interface ListingDocument {
   dateOverrides: DateOverride[];
   /** Absent on listings the vendor has never configured a boost for. */
   lastMinBoost?: LastMinBoost;
+  /** Mandatory partial payment configuration set by venue owner. */
+  partialPayment?: PartialPaymentConfig;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -205,6 +213,15 @@ const lastMinBoostSchema = new Schema<LastMinBoost>(
     slotStarts: { type: [String], default: [] },
     discountPct: { type: Number, min: 10, max: 30, default: 10 },
     triggerMins: { type: Number, min: 1, max: 240, default: 10 },
+  },
+  { _id: false }
+);
+
+const partialPaymentSchema = new Schema<PartialPaymentConfig>(
+  {
+    enabled: { type: Boolean, default: true },
+    type: { type: String, enum: ["percentage", "fixed"], default: "percentage" },
+    value: { type: Number, min: 0, default: 25 },
   },
   { _id: false }
 );
@@ -268,6 +285,7 @@ const listingSchema = new Schema<ListingDocument>(
     dailyRoutine: { type: Boolean, default: true },
     dateOverrides: { type: [dateOverrideSchema], default: [] },
     lastMinBoost: { type: lastMinBoostSchema, required: false },
+    partialPayment: { type: partialPaymentSchema, default: () => ({ enabled: true, type: "percentage", value: 25 }) },
     technicalSpecs: {
       type: [
         new Schema<TechnicalSpec>(

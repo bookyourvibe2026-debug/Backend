@@ -14,7 +14,7 @@ interface PricingResult {
   vendorEarning: number;
 }
 
-function computePricing(baseAmount: number, discountPercent = 0): PricingResult {
+export function computePricing(baseAmount: number, discountPercent = 0): PricingResult {
   const discounted = baseAmount - (baseAmount * discountPercent) / 100;
   const platformFee = Math.round((discounted * env.PLATFORM_COMMISSION_PERCENT) / 100);
   const taxes = 0;
@@ -42,13 +42,13 @@ export interface CreateBookingInput {
 /* ── Slot availability ──
  * Bookings store their slot start as a UTC instant plus an optional "HH:mm" end;
  * everything below works in IST because that's the timezone slots are sold in. */
-const IST = "Asia/Kolkata";
+export const IST = "Asia/Kolkata";
 
-function istTimeHHmm(d: Date): string {
+export function istTimeHHmm(d: Date): string {
   return d.toLocaleTimeString("en-GB", { timeZone: IST, hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-function timeToMinutes(t: string): number {
+export function timeToMinutes(t: string): number {
   const [h = 0, m = 0] = t.split(":").map(Number);
   return h * 60 + m;
 }
@@ -67,7 +67,7 @@ export async function getBookedRangesForDate(listingId: string, date: string): P
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
   const bookings = await BookingModel.find({
     listingId,
-    status: { $ne: "Cancelled" },
+    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
     dateTime: { $gte: dayStart, $lt: dayEnd },
   }).select("dateTime endTime status courtId");
 
@@ -271,7 +271,20 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
 
   const pricing = computePricing(baseAmount, discountPercent);
   const orderId = generateOrderId();
-  const chargeNow = pricing.totalAmount;
+
+  // Mandatory Partial Payment calculation configured on venue/listing
+  const partialConfig = listing.partialPayment ?? { enabled: true, type: "percentage", value: 25 };
+  let requiredPaid = pricing.totalAmount;
+  if (partialConfig.enabled !== false) {
+    if (partialConfig.type === "fixed") {
+      requiredPaid = Math.min(pricing.totalAmount, Math.max(1, Math.round(partialConfig.value)));
+    } else {
+      const pct = Math.min(100, Math.max(1, partialConfig.value));
+      requiredPaid = Math.min(pricing.totalAmount, Math.max(1, Math.round((pricing.totalAmount * pct) / 100)));
+    }
+  }
+
+  const chargeNow = requiredPaid;
 
   let paymentOrderId: string | undefined;
   if (input.payment === "Cashfree (Online)") {
@@ -313,9 +326,32 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     vendorEarning: pricing.vendorEarning,
     payment: input.payment,
     paymentOrderId,
-    paymentStatus: input.payment === "Cashfree (Online)" ? "pending" : "pending",
+    paymentStatus: "pending",
     status: "Pending",
   });
+}
+
+export async function confirmBookingPayment(orderId: string, customerId?: string, paymentId?: string): Promise<BookingDocument> {
+  const filter: FilterQuery<BookingDocument> = { orderId };
+  if (customerId) filter.customerId = customerId;
+
+  const booking = await BookingModel.findOne(filter);
+  if (!booking) throw ApiError.notFound("Booking not found");
+
+  if (booking.status === "Confirmed" || booking.status === "Part Paid" || booking.status === "Completed") {
+    return booking;
+  }
+
+  if (booking.paymentOrderId) {
+    await paymentProvider.verifyPayment(booking.paymentOrderId);
+  }
+
+  const isPartial = (booking.paidAmount ?? 0) > 0 && (booking.paidAmount ?? 0) < booking.totalAmount;
+  booking.paymentStatus = "paid";
+  booking.status = isPartial ? "Part Paid" : "Confirmed";
+  await booking.save();
+
+  return booking;
 }
 
 export interface CreateManualBookingInput {

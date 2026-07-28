@@ -1,0 +1,371 @@
+import { FilterQuery, Types } from "mongoose";
+import { HostedMatchDocument, HostedMatchModel, HostedMatchParticipant } from "../models/HostedMatch.model";
+import { ListingModel, Court } from "../models/Listing.model";
+import { CustomerModel } from "../models/Customer.model";
+import { BookingModel } from "../models/Booking.model";
+import { paymentProvider } from "./payment/payment.service";
+import { ApiError } from "../utils/ApiError";
+import { activeBoostPct, boostedPrice } from "./lastMinBoost.service";
+import { istTimeHHmm, timeToMinutes, computePricing, IST } from "./booking.service";
+
+export interface CreateHostedMatchInput {
+  listingId: string;
+  sport: string;
+  dateTime: string;
+  durationMinutes?: number;
+  courtId?: string;
+  pricingType: "host_pays_all" | "split_cost";
+  entryFeePerPlayer?: number;
+  maxPlayers: number;
+  hostName?: string;
+  hostPhone?: string;
+  hostEmail?: string;
+}
+
+function generateMatchId(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let suffix = "";
+  for (let i = 0; i < 6; i++) {
+    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `HM-${suffix}`;
+}
+
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  const aE = aEnd <= aStart ? aEnd + 1440 : aEnd;
+  const bE = bEnd <= bStart ? bEnd + 1440 : bEnd;
+  return aStart < bE && bStart < aE;
+}
+
+export async function createHostedMatch(
+  hostCustomerId: string,
+  input: CreateHostedMatchInput
+): Promise<HostedMatchDocument> {
+  const customer = await CustomerModel.findById(hostCustomerId);
+  if (!customer) throw ApiError.notFound("Host customer profile not found");
+
+  const listing = await ListingModel.findOne({ _id: input.listingId, status: "Active", isPrivate: false });
+  if (!listing) throw ApiError.notFound("Listing not found or unavailable");
+
+  const hostName = input.hostName || customer.name || "Match Host";
+  const hostPhone = input.hostPhone || customer.phone;
+  if (!hostPhone) throw ApiError.badRequest("Mobile number is required to host a match");
+
+  const bDate = new Date(input.dateTime);
+  const dateStr = bDate.toLocaleDateString("en-CA", { timeZone: IST });
+  const startTime = istTimeHHmm(bDate);
+  const durationMin = input.durationMinutes || 60;
+  const endTime = istTimeHHmm(new Date(bDate.getTime() + durationMin * 60_000));
+
+  // Compute Turf Pricing for the selected slot & duration
+  let baseAmount = listing.price || 1000;
+  let selectedCourt: Court | undefined;
+
+  if (listing.type === "Turf") {
+    const startMin = timeToMinutes(startTime);
+    const endMin = startMin + durationMin;
+    const slots = listing.slotsList || [];
+
+    if (slots.length > 0) {
+      let coveredMin = 0;
+      let weightedSum = 0;
+      for (const s of slots) {
+        const sStart = timeToMinutes(s.startTime);
+        let sEnd = timeToMinutes(s.endTime);
+        if (sEnd <= sStart) sEnd += 1440;
+        const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
+        if (overlap > 0) {
+          coveredMin += overlap;
+          weightedSum += overlap * s.price;
+        }
+      }
+      if (coveredMin > 0) {
+        baseAmount = Math.round(weightedSum / coveredMin);
+      }
+    }
+
+    if (input.courtId) {
+      selectedCourt = (listing.courts ?? []).find((c) => c.id === input.courtId);
+      if (selectedCourt?.priceOverride != null) {
+        baseAmount = selectedCourt.priceOverride;
+      }
+    }
+
+    baseAmount = Math.round((durationMin / 60) * baseAmount);
+
+    const nowIst = new Date();
+    if (dateStr === nowIst.toLocaleDateString("en-CA", { timeZone: IST })) {
+      const boostPct = activeBoostPct(
+        listing.lastMinBoost,
+        startTime,
+        timeToMinutes(istTimeHHmm(nowIst)),
+        input.sport
+      );
+      if (boostPct > 0) baseAmount = boostedPrice(baseAmount, boostPct);
+    }
+  }
+
+  const pricing = computePricing(baseAmount, 0);
+  const totalTurfCost = pricing.totalAmount;
+
+  let entryFee = 0;
+  let hostPaidAmount = totalTurfCost;
+
+  if (input.pricingType === "split_cost") {
+    entryFee = Math.max(0, Math.round(input.entryFeePerPlayer || 0));
+    if (entryFee <= 0) {
+      throw ApiError.badRequest("Please set a valid entry fee per player for split cost match");
+    }
+    hostPaidAmount = entryFee;
+  }
+
+  const matchId = generateMatchId();
+
+  // Create payment order for host
+  const order = await paymentProvider.createOrder({
+    orderId: matchId,
+    amount: hostPaidAmount,
+    customerName: hostName,
+    customerEmail: input.hostEmail || customer.email || "host@byv.com",
+    customerPhone: hostPhone,
+  });
+
+  const hostParticipant: HostedMatchParticipant = {
+    participantId: `part-host-${Date.now()}`,
+    customerId: customer._id,
+    name: hostName,
+    phone: hostPhone,
+    email: customer.email,
+    joinedAt: new Date(),
+    status: "Confirmed",
+    paymentStatus: "pending",
+    amountPaid: hostPaidAmount,
+  };
+
+  return HostedMatchModel.create({
+    matchId,
+    listingId: listing._id,
+    vendorId: listing.vendorId,
+    hostCustomerId: customer._id,
+    hostName,
+    hostPhone,
+    hostEmail: input.hostEmail || customer.email,
+    sport: input.sport,
+    date: dateStr,
+    dateTime: bDate,
+    startTime,
+    endTime,
+    durationMinutes: durationMin,
+    courtId: selectedCourt?.id,
+    courtName: selectedCourt?.name,
+    pricingType: input.pricingType,
+    totalTurfCost,
+    hostPaidAmount,
+    entryFeePerPlayer: entryFee,
+    maxPlayers: input.maxPlayers,
+    hostPaymentOrderId: order.providerOrderId,
+    hostPaymentStatus: "pending",
+    status: "Awaiting Host Payment",
+    participants: [hostParticipant],
+  });
+}
+
+export async function confirmHostPayment(
+  matchId: string,
+  hostCustomerId?: string
+): Promise<HostedMatchDocument> {
+  const filter: FilterQuery<HostedMatchDocument> = { matchId };
+  if (hostCustomerId) filter.hostCustomerId = hostCustomerId;
+
+  const match = await HostedMatchModel.findOne(filter);
+  if (!match) throw ApiError.notFound("Hosted match not found");
+
+  if (match.status === "Open for Joining" || match.status === "Full" || match.status === "Completed") {
+    return match; // Already confirmed & open
+  }
+
+  if (match.hostPaymentOrderId) {
+    await paymentProvider.verifyPayment(match.hostPaymentOrderId);
+  }
+
+  // Create underlying turf booking so the court slot is locked on the venue calendar
+  const bookingOrderId = `BK-${match.matchId}`;
+  const booking = await BookingModel.create({
+    orderId: bookingOrderId,
+    listingId: match.listingId,
+    vendorId: match.vendorId,
+    customerId: match.hostCustomerId,
+    customerName: match.hostName,
+    phone: match.hostPhone,
+    email: match.hostEmail,
+    sport: match.sport,
+    courtId: match.courtId,
+    courtName: match.courtName,
+    dateTime: match.dateTime,
+    endTime: match.endTime,
+    totalAmount: match.totalTurfCost,
+    paidAmount: match.hostPaidAmount,
+    platformFee: 0,
+    taxes: 0,
+    vendorEarning: match.totalTurfCost,
+    payment: "Cashfree (Online)",
+    paymentOrderId: match.hostPaymentOrderId,
+    paymentStatus: "paid",
+    status: match.hostPaidAmount < match.totalTurfCost ? "Part Paid" : "Confirmed",
+  });
+
+  match.hostPaymentStatus = "paid";
+  match.bookingId = booking._id;
+  match.status = "Open for Joining";
+
+  // Update host participant status
+  if (match.participants.length > 0 && match.participants[0]) {
+    match.participants[0].paymentStatus = "paid";
+  }
+
+  await match.save();
+  return match;
+}
+
+export async function listOpenHostedMatches(filters: { sport?: string; date?: string; limit?: number }) {
+  const query: FilterQuery<HostedMatchDocument> = { status: { $in: ["Open for Joining", "Full"] } };
+  if (filters.sport) query.sport = filters.sport;
+  if (filters.date) query.date = filters.date;
+
+  const matches = await HostedMatchModel.find(query)
+    .populate("listingId", "title coverImage address city type")
+    .sort({ dateTime: 1 })
+    .limit(filters.limit || 30);
+
+  return matches;
+}
+
+export async function getHostedMatchById(matchId: string): Promise<HostedMatchDocument> {
+  const match = await HostedMatchModel.findOne({ matchId }).populate("listingId", "title coverImage address city type price");
+  if (!match) throw ApiError.notFound("Match not found");
+  return match;
+}
+
+export async function requestToJoinMatch(
+  matchId: string,
+  player: { customerId?: string; name: string; phone?: string; email?: string }
+): Promise<HostedMatchDocument> {
+  const match = await HostedMatchModel.findOne({ matchId });
+  if (!match) throw ApiError.notFound("Hosted match not found");
+
+  if (match.status !== "Open for Joining") {
+    throw ApiError.badRequest(`This match is currently ${match.status.toLowerCase()} and not accepting new players.`);
+  }
+
+  const confirmedCount = match.participants.filter((p) => p.status === "Confirmed").length;
+  if (confirmedCount >= match.maxPlayers) {
+    throw ApiError.badRequest("This match has reached its maximum player capacity.");
+  }
+
+  // Check if player already requested or joined
+  const existing = match.participants.find(
+    (p) =>
+      (player.customerId && p.customerId?.toString() === player.customerId) ||
+      (player.phone && p.phone === player.phone)
+  );
+
+  if (existing) {
+    if (existing.status === "Rejected") {
+      throw ApiError.badRequest("Your join request for this match was declined by the host.");
+    }
+    return match; // Already joined or requested
+  }
+
+  const participantId = `part-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  match.participants.push({
+    participantId,
+    customerId: player.customerId ? new Types.ObjectId(player.customerId) : null,
+    name: player.name,
+    phone: player.phone,
+    email: player.email,
+    joinedAt: new Date(),
+    status: "Pending Approval",
+    paymentStatus: "pending",
+    amountPaid: 0,
+  });
+
+  await match.save();
+  return match;
+}
+
+export async function respondToJoinRequest(
+  matchId: string,
+  hostCustomerId: string,
+  participantId: string,
+  action: "accept" | "reject"
+): Promise<{ match: HostedMatchDocument; playerOrderId?: string }> {
+  const match = await HostedMatchModel.findOne({ matchId, hostCustomerId });
+  if (!match) throw ApiError.notFound("Hosted match not found or unauthorized");
+
+  const participant = match.participants.find((p) => p.participantId === participantId);
+  if (!participant) throw ApiError.notFound("Participant request not found");
+
+  let playerOrderId: string | undefined;
+
+  if (action === "reject") {
+    participant.status = "Rejected";
+    participant.paymentStatus = "failed";
+  } else if (action === "accept") {
+    if (match.entryFeePerPlayer > 0) {
+      participant.status = "Payment Pending";
+      playerOrderId = `${match.matchId}-P${Date.now().toString().slice(-4)}`;
+      const order = await paymentProvider.createOrder({
+        orderId: playerOrderId,
+        amount: match.entryFeePerPlayer,
+        customerName: participant.name,
+        customerEmail: participant.email || "player@byv.com",
+        customerPhone: participant.phone || match.hostPhone,
+      });
+      participant.paymentOrderId = order.providerOrderId;
+    } else {
+      participant.status = "Confirmed";
+      participant.paymentStatus = "paid";
+      participant.amountPaid = 0;
+
+      const confirmedCount = match.participants.filter((p) => p.status === "Confirmed").length;
+      if (confirmedCount >= match.maxPlayers) {
+        match.status = "Full";
+      }
+    }
+  }
+
+  await match.save();
+  return { match, playerOrderId };
+}
+
+export async function confirmPlayerPayment(
+  matchId: string,
+  participantId: string,
+  customerId?: string
+): Promise<HostedMatchDocument> {
+  const match = await HostedMatchModel.findOne({ matchId });
+  if (!match) throw ApiError.notFound("Hosted match not found");
+
+  const participant = match.participants.find((p) => p.participantId === participantId);
+  if (!participant) throw ApiError.notFound("Participant record not found");
+
+  if (participant.status === "Confirmed" && participant.paymentStatus === "paid") {
+    return match;
+  }
+
+  if (participant.paymentOrderId) {
+    await paymentProvider.verifyPayment(participant.paymentOrderId);
+  }
+
+  participant.paymentStatus = "paid";
+  participant.status = "Confirmed";
+  participant.amountPaid = match.entryFeePerPlayer;
+
+  const confirmedCount = match.participants.filter((p) => p.status === "Confirmed").length;
+  if (confirmedCount >= match.maxPlayers) {
+    match.status = "Full";
+  }
+
+  await match.save();
+  return match;
+}

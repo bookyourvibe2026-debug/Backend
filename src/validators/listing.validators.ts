@@ -26,6 +26,12 @@ const lastMinBoostSchema = z.object({
   triggerMins: z.number().int().min(1).max(240),
 });
 
+const partialPaymentSchema = z.object({
+  enabled: z.boolean().default(true),
+  type: z.enum(["percentage", "fixed"]).default("percentage"),
+  value: z.number().nonnegative(),
+});
+
 export const createListingSchema = z.object({
   title: z.string().trim().min(2).max(200),
   type: z.enum(["Turf", "Game", "Event"]),
@@ -82,6 +88,7 @@ export const createListingSchema = z.object({
     .optional(),
   dailyRoutine: z.boolean().optional(),
   lastMinBoost: lastMinBoostSchema.optional(),
+  partialPayment: partialPaymentSchema.optional(),
   dateOverrides: z
     .array(
       z.object({

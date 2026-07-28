@@ -3,7 +3,7 @@ import { CustomerModel } from "../../models/Customer.model";
 import { ApiError } from "../../utils/ApiError";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { cancelOwnBooking, createBooking, getBookingByOrderId, listBookingsForCustomer } from "../../services/booking.service";
+import { cancelOwnBooking, confirmBookingPayment, createBooking, getBookingByOrderId, listBookingsForCustomer } from "../../services/booking.service";
 
 export const createMyBooking = asyncHandler(async (req: Request, res: Response) => {
   const customer = await CustomerModel.findById(req.auth!.sub);
@@ -31,6 +31,11 @@ export const createMyBooking = asyncHandler(async (req: Request, res: Response) 
   }
 
   sendSuccess(res, 201, booking, "Booking created");
+});
+
+export const confirmMyBookingPayment = asyncHandler(async (req: Request, res: Response) => {
+  const booking = await confirmBookingPayment(req.params.orderId!, req.auth!.sub, req.body.paymentId);
+  sendSuccess(res, 200, booking, "Payment confirmed and booking reserved");
 });
 
 export const getMyBookings = asyncHandler(async (req: Request, res: Response) => {
