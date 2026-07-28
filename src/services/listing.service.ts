@@ -71,6 +71,118 @@ export async function findPublicListingById(id: string) {
   });
 }
 
+/* ── City rankings ──
+ * "BYV Udaipur Ranking": the venues in a city taking the most bookings, so players
+ * can see where the city actually plays. Ranked on confirmed booking volume, not on
+ * anything a vendor can set themselves. */
+
+export interface RankingQuery {
+  city: string;
+  /** Locality inside the city — one of the `areas` values returned alongside the rows. */
+  area?: string;
+  limit: number;
+  /** Only count bookings from the last N days. 0/absent = all time. */
+  days?: number;
+}
+
+export interface RankedVenue {
+  rank: number;
+  listingId: string;
+  slug?: string;
+  title: string;
+  city: string;
+  area: string;
+  address: string;
+  image: string;
+  price: number;
+  categories: string[];
+  tags: string[];
+  bookings: number;
+}
+
+/**
+ * The locality a venue sits in, pulled out of its address. Addresses come from
+ * Nominatim as "Venue, Road, Locality, City, District, State, PIN, Country", so the
+ * segment just before the city is the locality; we fall back to the second segment
+ * (and finally to the city) when the address doesn't follow that shape.
+ */
+export function areaFromAddress(address: string | undefined, city: string): string {
+  const parts = (address ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 1 && !/^\d[\d\s-]*$/.test(p)); // drop PIN codes / house numbers
+  if (parts.length === 0) return city;
+
+  const cityIndex = parts.findIndex((p) => p.toLowerCase() === city.toLowerCase());
+  if (cityIndex > 0) return parts[cityIndex - 1]!;
+  if (parts.length > 1) return parts[1]!;
+  return parts[0] ?? city;
+}
+
+export async function findVenueRankings(query: RankingQuery) {
+  const cacheKey = `${PUBLIC_CACHE_PREFIX}rank:${JSON.stringify({
+    city: query.city,
+    area: query.area ?? "",
+    limit: query.limit,
+    days: query.days ?? 0,
+  })}`;
+
+  return cached(cacheKey, PUBLIC_CACHE_TTL_MS, async () => {
+    const listings = await ListingModel.find({
+      status: "Active",
+      isPrivate: false,
+      type: { $in: ["Turf", "Game"] },
+      city: new RegExp(`^${escapeRegex(query.city)}$`, "i"),
+    }).select("title slug city address coverImage images price categories tags");
+
+    // Every area in the city, so the filter offers real choices rather than a guess.
+    const areas = Array.from(
+      new Set(listings.map((l) => areaFromAddress(l.address, l.city)).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+
+    const inScope = query.area
+      ? listings.filter((l) => areaFromAddress(l.address, l.city).toLowerCase() === query.area!.toLowerCase())
+      : listings;
+
+    if (inScope.length === 0) return { items: [] as RankedVenue[], areas, city: query.city };
+
+    const match: Record<string, unknown> = {
+      listingId: { $in: inScope.map((l) => l._id) },
+      status: { $in: ["Confirmed", "Part Paid", "Completed"] },
+    };
+    if (query.days && query.days > 0) {
+      match.createdAt = { $gte: new Date(Date.now() - query.days * 24 * 60 * 60_000) };
+    }
+
+    const counts = await BookingModel.aggregate<{ _id: unknown; bookings: number }>([
+      { $match: match },
+      { $group: { _id: "$listingId", bookings: { $sum: 1 } } },
+    ]);
+    const countById = new Map(counts.map((c) => [String(c._id), c.bookings]));
+
+    const items = inScope
+      .map((l) => ({
+        listingId: String(l._id),
+        slug: l.slug,
+        title: l.title,
+        city: l.city,
+        area: areaFromAddress(l.address, l.city),
+        address: l.address,
+        image: l.coverImage || l.images?.[0]?.url || "",
+        price: l.price,
+        categories: l.categories ?? [],
+        tags: l.tags ?? [],
+        bookings: countById.get(String(l._id)) ?? 0,
+      }))
+      // Ties break on price so the order is stable between requests.
+      .sort((a, b) => b.bookings - a.bookings || a.price - b.price || a.title.localeCompare(b.title))
+      .slice(0, query.limit)
+      .map((row, index): RankedVenue => ({ rank: index + 1, ...row }));
+
+    return { items, areas, city: query.city };
+  });
+}
+
 export async function findPublicVendorProfile(vendorId: string) {
   return cached(`${PUBLIC_CACHE_PREFIX}vendor:${vendorId}`, PUBLIC_CACHE_TTL_MS, async () => {
     const vendor = await VendorModel.findOne({ _id: vendorId, status: "approved" }).select(

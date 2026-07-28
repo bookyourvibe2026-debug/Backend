@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { findPublicListingById, findPublicListings, findPublicVendorProfile } from "../../services/listing.service";
+import { findPublicListingById, findPublicListings, findPublicVendorProfile, findVenueRankings } from "../../services/listing.service";
 import { getBookedRangesForDate } from "../../services/booking.service";
 
 /** Let the browser/CDN reuse public reads for a short window (matches the in-memory cache TTL). */
@@ -20,6 +20,20 @@ export const browseVenues = asyncHandler(async (req: Request, res: Response) => 
   };
 
   const result = await findPublicListings({ city, category, subCategory, type, vendorId, search, page, limit });
+  res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+  sendSuccess(res, 200, result);
+});
+
+/** Top venues in a city by booking volume — powers the home page's city ranking card. */
+export const getVenueRankings = asyncHandler(async (req: Request, res: Response) => {
+  const { city, area, limit, days } = req.query as unknown as {
+    city: string;
+    area?: string;
+    limit: number;
+    days?: number;
+  };
+
+  const result = await findVenueRankings({ city, area, limit, days });
   res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
   sendSuccess(res, 200, result);
 });

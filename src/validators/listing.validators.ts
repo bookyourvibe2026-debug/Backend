@@ -14,6 +14,10 @@ const courtSchema = z.object({
   sports: z.array(z.string()).default([]),
   /** Null clears an override back to "inherit the slot price". */
   priceOverride: z.number().nonnegative().nullable().optional(),
+  /** Per-sport rates on a court that hosts several games at different prices. */
+  sportPrices: z.array(z.object({ sport: z.string().min(1), price: z.number().nonnegative() })).max(30).optional(),
+  image: z.string().url().or(z.string().regex(/^$/)).optional(),
+  surface: z.string().trim().max(120).optional(),
   active: z.boolean().default(true),
 });
 
@@ -137,6 +141,14 @@ export const availabilityQuerySchema = z.object({
 
 export const vendorIdParamSchema = z.object({
   vendorId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid vendor id"),
+});
+
+/** City rankings — top venues by booking volume, optionally narrowed to one locality. */
+export const rankingsQuerySchema = z.object({
+  city: z.string().trim().min(1, "City is required"),
+  area: z.string().trim().optional(),
+  days: z.coerce.number().int().min(0).max(365).optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
 });
 
 export const publicListingQuerySchema = z.object({

@@ -81,8 +81,20 @@ export interface Court {
   sports: string[];
   /** Replaces the time slot's hourly rate on this court. Undefined = inherit the slot price. */
   priceOverride?: number;
+  /** Per-sport rate on this court, for venues charging differently per game on the same court. */
+  sportPrices?: CourtSportPrice[];
+  /** Photo shown on the court card at checkout. Picked from the listing's own images. */
+  image?: string;
+  /** Free-text surface/size line under the court name — "Outdoor · Synthetic · Full court". */
+  surface?: string;
   /** Inactive courts stay on the listing (so past bookings still resolve) but cannot be booked. */
   active: boolean;
+}
+
+/** One sport's hourly rate on a court that hosts several sports at different prices. */
+export interface CourtSportPrice {
+  sport: string;
+  price: number;
 }
 
 /**
@@ -183,12 +195,20 @@ const sportCapacitySchema = new Schema<SportCapacity>(
   { _id: false }
 );
 
+const courtSportPriceSchema = new Schema<CourtSportPrice>(
+  { sport: { type: String, required: true }, price: { type: Number, required: true, min: 0 } },
+  { _id: false }
+);
+
 const courtSchema = new Schema<Court>(
   {
     id: { type: String, required: true },
     name: { type: String, required: true, trim: true, maxlength: 80 },
     sports: { type: [String], default: [] },
     priceOverride: { type: Number, min: 0 },
+    sportPrices: { type: [courtSportPriceSchema], default: [] },
+    image: { type: String },
+    surface: { type: String, maxlength: 120 },
     active: { type: Boolean, default: true },
   },
   { _id: false }

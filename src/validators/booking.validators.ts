@@ -19,6 +19,8 @@ export const createBookingSchema = z.object({
   sport: z.string().trim().max(60).optional(),
   /** Omitted = let the backend auto-assign the first free court. */
   courtId: z.string().trim().max(60).optional(),
+  /** Several courts booked together for the same slot. Wins over `courtId` when non-empty. */
+  courtIds: z.array(z.string().trim().max(60)).max(50).optional(),
   durationMinutes: z.coerce.number().int().positive().optional(),
 });
 

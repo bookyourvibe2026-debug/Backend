@@ -34,6 +34,8 @@ export interface CreateBookingInput {
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   /** Court the customer picked. Omitted = auto-assign the first free court. */
   courtId?: string;
+  /** Several courts taken in one booking. Takes precedence over `courtId` when non-empty. */
+  courtIds?: string[];
   customerId?: string;
   sport?: string;
   durationMinutes?: number;
@@ -69,15 +71,21 @@ export async function getBookedRangesForDate(listingId: string, date: string): P
     listingId,
     status: { $in: ["Confirmed", "Part Paid", "Completed"] },
     dateTime: { $gte: dayStart, $lt: dayEnd },
-  }).select("dateTime endTime status courtId");
+  }).select("dateTime endTime status courtId courtIds");
 
-  return bookings.map((b) => ({
-    startTime: istTimeHHmm(b.dateTime),
-    // Legacy bookings without a stored end are assumed to run one hour.
-    endTime: b.endTime || istTimeHHmm(new Date(b.dateTime.getTime() + 60 * 60_000)),
-    status: b.status as BookedRange["status"],
-    ...(b.courtId ? { courtId: b.courtId } : {}),
-  }));
+  // A booking spanning several courts takes each of them out separately, so it is
+  // flattened into one range per court — callers then need no multi-court awareness.
+  return bookings.flatMap((b) => {
+    const base = {
+      startTime: istTimeHHmm(b.dateTime),
+      // Legacy bookings without a stored end are assumed to run one hour.
+      endTime: b.endTime || istTimeHHmm(new Date(b.dateTime.getTime() + 60 * 60_000)),
+      status: b.status as BookedRange["status"],
+    };
+    const courtIds = b.courtIds?.length ? b.courtIds : b.courtId ? [b.courtId] : [];
+    if (courtIds.length === 0) return [base];
+    return courtIds.map((courtId) => ({ ...base, courtId }));
+  });
 }
 
 /** Courts a listing can sell right now, optionally narrowed to the courts hosting one sport. */
@@ -88,32 +96,39 @@ export function bookableCourts(courts: Court[] | undefined, sport?: string): Cou
 }
 
 /**
- * Picks the court a booking lands on. An explicit choice is validated and must be free;
+ * Picks the courts a booking lands on. Explicit choices are validated and must all be free;
  * with no choice we auto-assign the first free court, so the venue keeps selling while
  * any court is open and clients that predate court selection still work.
+ *
+ * Several courts can be taken at once — a team booking 2 of a venue's 3 pickleball courts
+ * for the same hour is one booking that occupies both.
  */
-function chooseCourt(
+function chooseCourts(
   courts: Court[],
   overlapping: BookedRange[],
-  requestedId: string | undefined,
+  requestedIds: string[],
   sport: string | undefined
-): Court {
+): Court[] {
   // A booking with no courtId predates the migration, when the venue was one unit —
   // treat it as occupying the first court so it still blocks something.
   const defaultCourtId = courts[0]!.id;
   const takenIds = new Set(overlapping.map((r) => r.courtId || defaultCourtId));
 
-  if (requestedId) {
-    const court = courts.find((c) => c.id === requestedId);
-    if (!court) throw ApiError.badRequest("The selected court is not part of this venue");
-    if (!court.active) throw ApiError.badRequest(`${court.name} is currently unavailable`);
-    if (sport && court.sports.length > 0 && !court.sports.includes(sport)) {
-      throw ApiError.badRequest(`${court.name} does not host ${sport}`);
+  if (requestedIds.length > 0) {
+    const chosen: Court[] = [];
+    for (const requestedId of Array.from(new Set(requestedIds))) {
+      const court = courts.find((c) => c.id === requestedId);
+      if (!court) throw ApiError.badRequest("The selected court is not part of this venue");
+      if (!court.active) throw ApiError.badRequest(`${court.name} is currently unavailable`);
+      if (sport && court.sports.length > 0 && !court.sports.includes(sport)) {
+        throw ApiError.badRequest(`${court.name} does not host ${sport}`);
+      }
+      if (takenIds.has(court.id)) {
+        throw ApiError.conflict(`${court.name} is already booked for this time. Please pick another court or slot.`);
+      }
+      chosen.push(court);
     }
-    if (takenIds.has(court.id)) {
-      throw ApiError.conflict(`${court.name} is already booked for this time. Please pick another court or slot.`);
-    }
-    return court;
+    return chosen;
   }
 
   const candidates = bookableCourts(courts, sport);
@@ -124,7 +139,18 @@ function chooseCourt(
   }
   const free = candidates.find((c) => !takenIds.has(c.id));
   if (!free) throw ApiError.conflict("All courts are booked for this time. Please pick a different slot.");
-  return free;
+  return [free];
+}
+
+/**
+ * A court's hourly rate. The vendor prices a venue per time slot, and that rate is the
+ * single source of truth — every court in an hour costs the same, so what the player was
+ * quoted on the slot card is exactly what they are charged. Court-level rates are
+ * deliberately not consulted: two prices for one hour is what made the slot card and the
+ * court list disagree.
+ */
+export function courtHourlyRate(_court: Court | undefined, slotRate: number): number {
+  return slotRate;
 }
 
 function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
@@ -139,7 +165,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   if (!listing) throw ApiError.notFound("Listing not found or unavailable");
 
   let baseAmount = listing.price;
-  let selectedCourt: Court | undefined;
+  let selectedCourts: Court[] = [];
   const selectedPriceTier = input.priceTierId ? listing.priceTiers.find((t) => t.id === input.priceTierId) : undefined;
   if (input.priceTierId && !selectedPriceTier) {
     throw ApiError.badRequest("Selected price tier is not valid for this listing");
@@ -180,7 +206,8 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         );
       }
     } else {
-      selectedCourt = chooseCourt(courts, overlapping, input.courtId, input.sport);
+      const requestedIds = input.courtIds?.length ? input.courtIds : input.courtId ? [input.courtId] : [];
+      selectedCourts = chooseCourts(courts, overlapping, requestedIds, input.sport);
     }
 
     // Price is whatever slot(s) this booking actually overlaps, pro-rated by minutes
@@ -213,13 +240,14 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       }
     }
 
-    // A court's own rate replaces the slot rate entirely (clay court ₹800 vs synthetic
-    // ₹600 at the same hour); courts without an override just inherit the slot price.
-    if (selectedCourt?.priceOverride != null) {
-      baseHourlyRate = selectedCourt.priceOverride;
+    // Every court costs the slot rate, so taking 2 courts for an hour costs it twice.
+    // This is the same arithmetic booking-flow.tsx shows at checkout.
+    if (selectedCourts.length > 0) {
+      const perHour = selectedCourts.reduce((sum, court) => sum + courtHourlyRate(court, baseHourlyRate), 0);
+      baseAmount = Math.round((durationMin / 60) * perHour);
+    } else {
+      baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
     }
-
-    baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
 
     // Last Min Boost. Applied here, at the moment of booking, so the player is charged
     // exactly the discounted price the slot was advertised at — the deal is only live
@@ -311,8 +339,10 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     phone: input.phone,
     email: input.email,
     sport: input.sport,
-    courtId: selectedCourt?.id,
-    courtName: selectedCourt?.name,
+    courtId: selectedCourts[0]?.id,
+    courtName: selectedCourts[0]?.name,
+    courtIds: selectedCourts.length > 0 ? selectedCourts.map((c) => c.id) : undefined,
+    courtNames: selectedCourts.length > 0 ? selectedCourts.map((c) => c.name) : undefined,
     dateTime: input.dateTime,
     // Slot end as "HH:mm" (IST) so future availability checks know the real duration.
     endTime:

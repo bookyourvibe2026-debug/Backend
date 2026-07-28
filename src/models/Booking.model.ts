@@ -15,10 +15,15 @@ export interface BookingDocument {
   email?: string;
   /** Which sport the slot was booked for (vendor-entered on manual bookings). */
   sport?: string;
-  /** Which court on the listing was booked. Absent on bookings taken before courts existed. */
+  /** Which court on the listing was booked. Absent on bookings taken before courts existed.
+   *  When several courts are booked together this holds the first of `courtIds`. */
   courtId?: string;
   /** Court name captured at booking time, so renaming a court doesn't rewrite history. */
   courtName?: string;
+  /** Every court this booking occupies. A player can take 2 of 3 courts for the same hour. */
+  courtIds?: string[];
+  /** Court names captured at booking time, aligned with `courtIds`. */
+  courtNames?: string[];
   /** How many players are coming (vendor-entered on manual bookings). */
   numberOfPlayers?: number;
   /** Whether food & beverage is included with this booking. */
@@ -55,6 +60,8 @@ const bookingSchema = new Schema<BookingDocument>(
     sport: { type: String },
     courtId: { type: String },
     courtName: { type: String },
+    courtIds: { type: [String], default: undefined },
+    courtNames: { type: [String], default: undefined },
     numberOfPlayers: { type: Number, min: 1, max: 200 },
     foodIncluded: { type: Boolean },
     dateTime: { type: Date, required: true },

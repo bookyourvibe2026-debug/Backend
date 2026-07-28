@@ -85,10 +85,9 @@ export async function createHostedMatch(
     }
 
     if (input.courtId) {
+      // The court only decides *which* unit is taken, never the rate — the time slot
+      // price is the single source of truth across booking, hosting and the venue page.
       selectedCourt = (listing.courts ?? []).find((c) => c.id === input.courtId);
-      if (selectedCourt?.priceOverride != null) {
-        baseAmount = selectedCourt.priceOverride;
-      }
     }
 
     baseAmount = Math.round((durationMin / 60) * baseAmount);
