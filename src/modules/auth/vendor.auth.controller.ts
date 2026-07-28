@@ -70,11 +70,14 @@ export const registerVendor = asyncHandler(async (req: Request, res: Response) =
 
 export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
+  if (!password || !password.trim()) {
+    throw ApiError.unauthorized("Please enter the correct password to continue.");
+  }
 
   const vendor = await VendorModel.findOne({ email }).select("+passwordHash");
   if (vendor) {
     if (!(await comparePassword(password, vendor.passwordHash))) {
-      throw ApiError.unauthorized("Invalid credentials");
+      throw ApiError.unauthorized("Please enter the correct password to continue.");
     }
     if (vendor.status === "suspended") {
       throw ApiError.forbidden("This vendor account has been suspended.");
@@ -107,7 +110,7 @@ export const loginVendor = asyncHandler(async (req: Request, res: Response) => {
 
   const staff = await VendorStaffModel.findOne({ holderEmail: email }).select("+passwordHash");
   if (!staff || !(await comparePassword(password, staff.passwordHash))) {
-    throw ApiError.unauthorized("Invalid credentials");
+    throw ApiError.unauthorized("Please enter the correct password to continue.");
   }
   if (staff.status === "Inactive") {
     throw ApiError.forbidden("This account has been deactivated. Contact your business owner.");
