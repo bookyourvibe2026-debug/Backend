@@ -30,12 +30,12 @@ export const setMpin = asyncHandler(async (req: Request, res: Response) => {
 /** POST /vendor/mpin/verify — verify entered MPIN */
 export const verifyMpin = asyncHandler(async (req: Request, res: Response) => {
   const { pin } = req.body as { pin?: string };
-  if (!pin || !/^\d{4}$/.test(pin)) throw ApiError.badRequest("Please enter the correct password to continue.");
+  if (!pin || !/^\d{4}$/.test(pin)) throw ApiError.badRequest("PIN must be exactly 4 digits");
   const vendor = await VendorModel.findById(req.vendorId).select("+mpinHash");
   if (!vendor) throw ApiError.notFound("Vendor not found");
   if (!vendor.mpinHash) throw ApiError.badRequest("MPIN not set. Please create your MPIN first.");
   const match = await bcrypt.compare(pin, vendor.mpinHash);
-  if (!match) throw ApiError.unauthorized("Please enter the correct password to continue.");
+  if (!match) throw ApiError.unauthorized("Incorrect MPIN");
   sendSuccess(res, 200, null, "MPIN verified");
 });
 

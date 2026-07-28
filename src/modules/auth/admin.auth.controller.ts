@@ -12,14 +12,11 @@ const AUDIENCE = "admin" as const;
 
 export const loginAdmin = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  if (!password || !password.trim()) {
-    throw ApiError.unauthorized("Please enter the correct password to continue.");
-  }
 
   const admin = await AdminModel.findOne({ email }).select("+passwordHash");
   if (admin) {
     if (!(await comparePassword(password, admin.passwordHash))) {
-      throw ApiError.unauthorized("Please enter the correct password to continue.");
+      throw ApiError.unauthorized("Invalid credentials");
     }
     if (admin.status === "Inactive") {
       throw ApiError.forbidden("This account has been deactivated.");
@@ -43,7 +40,7 @@ export const loginAdmin = asyncHandler(async (req: Request, res: Response) => {
 
   const subUser = await AdminSubUserModel.findOne({ email }).select("+passwordHash");
   if (!subUser || !(await comparePassword(password, subUser.passwordHash))) {
-    throw ApiError.unauthorized("Please enter the correct password to continue.");
+    throw ApiError.unauthorized("Invalid credentials");
   }
   if (subUser.status === "Inactive") {
     throw ApiError.forbidden("This account has been deactivated.");
