@@ -224,16 +224,21 @@ export async function confirmHostPayment(
   }
 
   await match.save();
+  await match.populate("listingId", "title coverImage address city type price");
   return match;
 }
 
 export async function listOpenHostedMatches(filters: { sport?: string; date?: string; limit?: number }) {
-  const query: FilterQuery<HostedMatchDocument> = { status: { $in: ["Open for Joining", "Full"] } };
+  // Only return public matches that are Open for Joining, not past their date/time, and active
+  const query: FilterQuery<HostedMatchDocument> = {
+    status: "Open for Joining",
+    dateTime: { $gte: new Date(Date.now() - 3600_000) },
+  };
   if (filters.sport) query.sport = filters.sport;
   if (filters.date) query.date = filters.date;
 
   const matches = await HostedMatchModel.find(query)
-    .populate("listingId", "title coverImage address city type")
+    .populate("listingId", "title coverImage address city type price")
     .sort({ dateTime: 1 })
     .limit(filters.limit || 30);
 
