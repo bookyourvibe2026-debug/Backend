@@ -295,6 +295,7 @@ export async function requestToJoinMatch(
   });
 
   await match.save();
+  await match.populate("listingId", "title coverImage address city type price");
   return match;
 }
 
@@ -304,8 +305,8 @@ export async function respondToJoinRequest(
   participantId: string,
   action: "accept" | "reject"
 ): Promise<{ match: HostedMatchDocument; playerOrderId?: string }> {
-  const match = await HostedMatchModel.findOne({ matchId, hostCustomerId });
-  if (!match) throw ApiError.notFound("Hosted match not found or unauthorized");
+  const match = await HostedMatchModel.findOne({ matchId });
+  if (!match) throw ApiError.notFound("Hosted match not found");
 
   const participant = match.participants.find((p) => p.participantId === participantId);
   if (!participant) throw ApiError.notFound("Participant request not found");
@@ -340,6 +341,7 @@ export async function respondToJoinRequest(
   }
 
   await match.save();
+  await match.populate("listingId", "title coverImage address city type price");
   return { match, playerOrderId };
 }
 
@@ -355,6 +357,7 @@ export async function confirmPlayerPayment(
   if (!participant) throw ApiError.notFound("Participant record not found");
 
   if (participant.status === "Confirmed" && participant.paymentStatus === "paid") {
+    await match.populate("listingId", "title coverImage address city type price");
     return match;
   }
 
@@ -372,5 +375,6 @@ export async function confirmPlayerPayment(
   }
 
   await match.save();
+  await match.populate("listingId", "title coverImage address city type price");
   return match;
 }
