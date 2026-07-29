@@ -32,6 +32,7 @@ export interface BookingDocument {
   endTime?: string;
   totalAmount: number;
   paidAmount?: number;
+  paymentType?: "partial" | "full";
   platformFee: number;
   taxes: number;
   affiliateAmount: number;
@@ -69,6 +70,7 @@ const bookingSchema = new Schema<BookingDocument>(
     endTime: { type: String },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number },
+    paymentType: { type: String, enum: ["partial", "full"], default: "partial" },
     platformFee: { type: Number, required: true, min: 0, default: 0 },
     taxes: { type: Number, required: true, min: 0, default: 0 },
     affiliateAmount: { type: Number, required: true, min: 0, default: 0 },

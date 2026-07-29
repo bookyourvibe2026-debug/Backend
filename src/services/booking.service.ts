@@ -32,6 +32,7 @@ export interface CreateBookingInput {
   phone: string;
   email?: string;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
+  paymentType?: "partial" | "full";
   /** Court the customer picked. Omitted = auto-assign the first free court. */
   courtId?: string;
   /** Several courts taken in one booking. Takes precedence over `courtId` when non-empty. */
@@ -300,10 +301,13 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   const pricing = computePricing(baseAmount, discountPercent);
   const orderId = generateOrderId();
 
-  // Mandatory Partial Payment calculation configured on venue/listing
+  // Partial or Full Payment calculation configured on venue/listing or requested by user
   const partialConfig = listing.partialPayment ?? { enabled: true, type: "percentage", value: 25 };
+  const selectedPaymentType: "partial" | "full" =
+    input.paymentType ?? (partialConfig.enabled !== false ? "partial" : "full");
+
   let requiredPaid = pricing.totalAmount;
-  if (partialConfig.enabled !== false) {
+  if (selectedPaymentType === "partial" && partialConfig.enabled !== false) {
     if (partialConfig.type === "fixed") {
       requiredPaid = Math.min(pricing.totalAmount, Math.max(1, Math.round(partialConfig.value)));
     } else {
@@ -351,6 +355,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         : undefined,
     totalAmount: pricing.totalAmount,
     paidAmount: chargeNow,
+    paymentType: selectedPaymentType,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
     vendorEarning: pricing.vendorEarning,
@@ -376,7 +381,7 @@ export async function confirmBookingPayment(orderId: string, customerId?: string
     await paymentProvider.verifyPayment(booking.paymentOrderId);
   }
 
-  const isPartial = (booking.paidAmount ?? 0) > 0 && (booking.paidAmount ?? 0) < booking.totalAmount;
+  const isPartial = booking.paymentType === "partial" && (booking.paidAmount ?? 0) < booking.totalAmount;
   booking.paymentStatus = "paid";
   booking.status = isPartial ? "Part Paid" : "Confirmed";
   await booking.save();

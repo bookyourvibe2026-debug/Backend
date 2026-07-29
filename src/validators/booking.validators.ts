@@ -16,6 +16,7 @@ export const createBookingSchema = z.object({
     .optional(),
   email: z.string().trim().toLowerCase().email().optional(),
   payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
+  paymentType: z.enum(["partial", "full"]).optional(),
   sport: z.string().trim().max(60).optional(),
   /** Omitted = let the backend auto-assign the first free court. */
   courtId: z.string().trim().max(60).optional(),
