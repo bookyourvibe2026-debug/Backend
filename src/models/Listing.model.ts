@@ -32,6 +32,8 @@ export interface AddOn {
   label: string;
   price: number;
   image?: ListingImage;
+  /** Sports/games this add-on belongs to. Empty/undefined = available for all games. */
+  sports?: string[];
 }
 
 export interface Coupon {
@@ -188,7 +190,7 @@ const listingImageSchema = new Schema<ListingImage>({ id: String, url: String, l
 const faqSchema = new Schema<ListingFAQ>({ question: String, answer: String }, { _id: false });
 const itinerarySchema = new Schema<ItineraryStop>({ day: Number, title: String, description: String }, { _id: false });
 const priceTierSchema = new Schema<PriceTier>({ id: String, label: String, amount: Number }, { _id: false });
-const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number, image: { type: listingImageSchema, required: false } }, { _id: false });
+const addOnSchema = new Schema<AddOn>({ id: String, label: String, price: Number, image: { type: listingImageSchema, required: false }, sports: { type: [String], default: [] } }, { _id: false });
 const couponSchema = new Schema<Coupon>({ id: String, code: String, discountPercent: Number }, { _id: false });
 const sportCapacitySchema = new Schema<SportCapacity>(
   { category: { type: String, required: true }, maxPlayers: { type: Number, required: true, min: 1 } },
