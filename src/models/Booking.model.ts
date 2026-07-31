@@ -41,6 +41,7 @@ export interface BookingDocument {
   paymentStatus: PaymentStatus;
   paymentOrderId?: string;
   status: BookingStatus;
+  bookingType?: "regular" | "club_together" | "offline";
   isAffiliate: boolean;
   cancellationReason?: string;
   checkedIn: boolean;
@@ -55,8 +56,8 @@ const bookingSchema = new Schema<BookingDocument>(
     listingId: { type: Schema.Types.ObjectId, ref: "Listing", required: true, index: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true, index: true },
     customerId: { type: Schema.Types.ObjectId, ref: "Customer", default: null, index: true },
-    customerName: { type: String, required: true },
-    phone: { type: String, required: true },
+    customerName: { type: String, default: "Club Booking" },
+    phone: { type: String, default: "0000000000" },
     email: { type: String },
     sport: { type: String },
     courtId: { type: String },
@@ -68,6 +69,7 @@ const bookingSchema = new Schema<BookingDocument>(
     dateTime: { type: Date, required: true },
     /** Slot end as "HH:mm"; optional so existing bookings stay valid. */
     endTime: { type: String },
+    bookingType: { type: String, enum: ["regular", "club_together", "offline"], default: "regular" },
     totalAmount: { type: Number, required: true, min: 0 },
     paidAmount: { type: Number },
     paymentType: { type: String, enum: ["partial", "full"], default: "partial" },

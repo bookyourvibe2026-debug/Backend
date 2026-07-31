@@ -391,18 +391,19 @@ export async function confirmBookingPayment(orderId: string, customerId?: string
 
 export interface CreateManualBookingInput {
   listingId: string;
-  customerName: string;
-  phone: string;
+  customerName?: string;
+  phone?: string;
   sport?: string;
   courtId?: string;
   numberOfPlayers?: number;
   foodIncluded?: boolean;
   dateTime: Date;
   endTime?: string;
+  bookingType?: "regular" | "club_together" | "offline";
   totalAmount: number;
   paidAmount?: number;
-  payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
-  status: BookingDocument["status"];
+  payment?: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
+  status?: BookingDocument["status"];
 }
 
 /** Lets a vendor record a walk-in/offline booking directly, bypassing the online checkout pricing flow. */
@@ -411,14 +412,20 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
   if (!listing) throw ApiError.notFound("Listing not found for this vendor");
 
   const court = await resolveManualCourt(listing.courts ?? [], String(listing._id), input);
-  const pricing = computePricing(input.totalAmount);
+  const pricing = computePricing(input.totalAmount || 0);
+
+  const isClub = input.bookingType === "club_together";
+  const customerName = input.customerName || (isClub ? "Club Booking" : "Walk-in Customer");
+  const phone = input.phone || (isClub ? "0000000000" : "0000000000");
+  const payment = input.payment || "Cash (Offline)";
+  const status = input.status || "Confirmed";
 
   return BookingModel.create({
     orderId: generateOrderId(),
     listingId: listing._id,
     vendorId,
-    customerName: input.customerName,
-    phone: input.phone,
+    customerName,
+    phone,
     sport: input.sport,
     courtId: court?.id,
     courtName: court?.name,
@@ -426,14 +433,15 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
     foodIncluded: input.foodIncluded,
     dateTime: input.dateTime,
     endTime: input.endTime,
+    bookingType: input.bookingType || (isClub ? "club_together" : "offline"),
     totalAmount: pricing.totalAmount,
     paidAmount: input.paidAmount !== undefined ? input.paidAmount : pricing.totalAmount,
     platformFee: pricing.platformFee,
     taxes: pricing.taxes,
     vendorEarning: pricing.vendorEarning,
-    payment: input.payment,
+    payment,
     paymentStatus: "paid",
-    status: input.status,
+    status,
   });
 }
 
