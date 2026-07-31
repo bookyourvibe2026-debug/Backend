@@ -26,6 +26,7 @@ export interface HostedMatchParticipant {
   paymentStatus: "pending" | "paid" | "failed";
   paymentOrderId?: string;
   amountPaid: number;
+  approvalExpiresAt?: Date;
 }
 
 export interface HostedMatchDocument extends Document {
@@ -78,6 +79,7 @@ const participantSchema = new Schema<HostedMatchParticipant>(
     },
     paymentOrderId: { type: String },
     amountPaid: { type: Number, default: 0 },
+    approvalExpiresAt: { type: Date },
   },
   { _id: false }
 );

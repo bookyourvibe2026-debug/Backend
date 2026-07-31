@@ -9,6 +9,14 @@ export interface CreateNotificationInput {
   type: NotificationType;
   matchId?: string;
   participantId?: string;
+  playerName?: string;
+  playerAvatar?: string;
+  sport?: string;
+  turfName?: string;
+  date?: string;
+  timeSlot?: string;
+  entryFee?: number;
+  expiresAt?: Date;
   actionUrl?: string;
 }
 
@@ -21,6 +29,14 @@ export async function createNotification(input: CreateNotificationInput): Promis
     type: input.type,
     matchId: input.matchId,
     participantId: input.participantId,
+    playerName: input.playerName,
+    playerAvatar: input.playerAvatar,
+    sport: input.sport,
+    turfName: input.turfName,
+    date: input.date,
+    timeSlot: input.timeSlot,
+    entryFee: input.entryFee,
+    expiresAt: input.expiresAt,
     actionUrl: input.actionUrl,
   });
 }
@@ -28,7 +44,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
 export async function listNotificationsForUser(
   customerId?: string,
   phone?: string,
-  limit = 20
+  limit = 30
 ): Promise<NotificationDocument[]> {
   const conditions: any[] = [];
   if (customerId) conditions.push({ recipientCustomerId: customerId });

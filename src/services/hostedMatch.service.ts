@@ -296,8 +296,11 @@ export async function requestToJoinMatch(
   });
 
   await match.save();
+  await match.populate("listingId", "title coverImage address city type price");
 
-  // Send real-time notification to the host
+  const turfTitle = typeof match.listingId === "object" ? (match.listingId as any).title : "Sports Venue";
+
+  // Send real-time notification to the host with full request metadata
   await createNotification({
     recipientCustomerId: match.hostCustomerId,
     recipientPhone: match.hostPhone,
@@ -306,10 +309,15 @@ export async function requestToJoinMatch(
     type: "join_request",
     matchId: match.matchId,
     participantId,
+    playerName: player.name,
+    sport: match.sport,
+    turfName: turfTitle,
+    date: match.date,
+    timeSlot: `${match.startTime} – ${match.endTime}`,
+    entryFee: match.entryFeePerPlayer,
     actionUrl: "/community",
   }).catch(() => {});
 
-  await match.populate("listingId", "title coverImage address city type price");
   return match;
 }
 
@@ -325,24 +333,36 @@ export async function respondToJoinRequest(
   const participant = match.participants.find((p) => p.participantId === participantId);
   if (!participant) throw ApiError.notFound("Participant request not found");
 
+  await match.populate("listingId", "title coverImage address city type price");
+  const turfTitle = typeof match.listingId === "object" ? (match.listingId as any).title : "Sports Venue";
+
   let playerOrderId: string | undefined;
 
   if (action === "reject") {
     participant.status = "Rejected";
     participant.paymentStatus = "failed";
 
-    // Notify player that request was declined
+    // Notify player that request was rejected
     await createNotification({
       recipientCustomerId: participant.customerId,
       recipientPhone: participant.phone,
-      title: "Join Request Declined",
-      message: `Your request to join ${match.sport} match on ${match.date} was declined by the host.`,
+      title: "Join Request Rejected",
+      message: "Your request to join the match has been rejected by the host.",
       type: "request_rejected",
       matchId: match.matchId,
       participantId: participant.participantId,
+      playerName: participant.name,
+      sport: match.sport,
+      turfName: turfTitle,
+      date: match.date,
+      timeSlot: `${match.startTime} – ${match.endTime}`,
+      entryFee: match.entryFeePerPlayer,
       actionUrl: "/community",
     }).catch(() => {});
   } else if (action === "accept") {
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes payment countdown
+    participant.approvalExpiresAt = expiresAt;
+
     if (match.entryFeePerPlayer > 0) {
       participant.status = "Payment Pending";
       playerOrderId = `${match.matchId}-P${Date.now().toString().slice(-4)}`;
@@ -355,15 +375,22 @@ export async function respondToJoinRequest(
       });
       participant.paymentOrderId = order.providerOrderId;
 
-      // Notify player to complete payment
+      // Notify player with Pay Now action and 10m timer
       await createNotification({
         recipientCustomerId: participant.customerId,
         recipientPhone: participant.phone,
-        title: "Request Accepted!",
-        message: "Your request has been accepted. Please complete the payment to confirm your booking.",
+        title: "Request Approved!",
+        message: "Your request has been approved. Complete your payment to confirm your booking.",
         type: "request_accepted",
         matchId: match.matchId,
         participantId: participant.participantId,
+        playerName: participant.name,
+        sport: match.sport,
+        turfName: turfTitle,
+        date: match.date,
+        timeSlot: `${match.startTime} – ${match.endTime}`,
+        entryFee: match.entryFeePerPlayer,
+        expiresAt,
         actionUrl: "/community",
       }).catch(() => {});
     } else {
@@ -379,18 +406,23 @@ export async function respondToJoinRequest(
       await createNotification({
         recipientCustomerId: participant.customerId,
         recipientPhone: participant.phone,
-        title: "Request Accepted!",
-        message: `Your request has been accepted. You are confirmed for ${match.sport} match!`,
+        title: "Booking Confirmed",
+        message: "Booking Confirmed. See you on the turf!",
         type: "payment_confirmed",
         matchId: match.matchId,
         participantId: participant.participantId,
+        playerName: participant.name,
+        sport: match.sport,
+        turfName: turfTitle,
+        date: match.date,
+        timeSlot: `${match.startTime} – ${match.endTime}`,
+        entryFee: match.entryFeePerPlayer,
         actionUrl: "/community",
       }).catch(() => {});
     }
   }
 
   await match.save();
-  await match.populate("listingId", "title coverImage address city type price");
   return { match, playerOrderId };
 }
 
@@ -410,6 +442,14 @@ export async function confirmPlayerPayment(
     return match;
   }
 
+  // Verify 10-minute timer hasn't expired
+  if (participant.approvalExpiresAt && participant.approvalExpiresAt < new Date()) {
+    participant.status = "Cancelled";
+    participant.paymentStatus = "failed";
+    await match.save();
+    throw ApiError.badRequest("Payment window expired (10 mins). Spot has been released.");
+  }
+
   if (participant.paymentOrderId) {
     await paymentProvider.verifyPayment(participant.paymentOrderId);
   }
@@ -424,19 +464,44 @@ export async function confirmPlayerPayment(
   }
 
   await match.save();
-
-  // Notify host that player has paid & confirmed
-  await createNotification({
-    recipientCustomerId: match.hostCustomerId,
-    recipientPhone: match.hostPhone,
-    title: "Player Payment Confirmed",
-    message: `${participant.name} completed entry fee payment (₹${match.entryFeePerPlayer}) and is confirmed for your ${match.sport} match!`,
-    type: "payment_confirmed",
-    matchId: match.matchId,
-    participantId: participant.participantId,
-    actionUrl: "/community",
-  }).catch(() => {});
-
   await match.populate("listingId", "title coverImage address city type price");
+  const turfTitle = typeof match.listingId === "object" ? (match.listingId as any).title : "Sports Venue";
+
+  // Notify BOTH player and host that booking is confirmed
+  await Promise.all([
+    createNotification({
+      recipientCustomerId: participant.customerId,
+      recipientPhone: participant.phone,
+      title: "Booking Confirmed",
+      message: "Booking Confirmed. See you on the turf!",
+      type: "payment_confirmed",
+      matchId: match.matchId,
+      participantId: participant.participantId,
+      playerName: participant.name,
+      sport: match.sport,
+      turfName: turfTitle,
+      date: match.date,
+      timeSlot: `${match.startTime} – ${match.endTime}`,
+      entryFee: match.entryFeePerPlayer,
+      actionUrl: "/community",
+    }),
+    createNotification({
+      recipientCustomerId: match.hostCustomerId,
+      recipientPhone: match.hostPhone,
+      title: "Booking Confirmed",
+      message: `Booking Confirmed. See you on the turf! ${participant.name} paid ₹${match.entryFeePerPlayer}.`,
+      type: "payment_confirmed",
+      matchId: match.matchId,
+      participantId: participant.participantId,
+      playerName: participant.name,
+      sport: match.sport,
+      turfName: turfTitle,
+      date: match.date,
+      timeSlot: `${match.startTime} – ${match.endTime}`,
+      entryFee: match.entryFeePerPlayer,
+      actionUrl: "/community",
+    }),
+  ]).catch(() => {});
+
   return match;
 }

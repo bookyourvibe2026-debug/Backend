@@ -4,7 +4,8 @@ export type NotificationType =
   | "join_request"
   | "request_accepted"
   | "request_rejected"
-  | "payment_confirmed";
+  | "payment_confirmed"
+  | "request_expired";
 
 export interface NotificationDocument extends Document {
   recipientCustomerId?: Types.ObjectId | null;
@@ -14,6 +15,14 @@ export interface NotificationDocument extends Document {
   type: NotificationType;
   matchId?: string;
   participantId?: string;
+  playerName?: string;
+  playerAvatar?: string;
+  sport?: string;
+  turfName?: string;
+  date?: string;
+  timeSlot?: string;
+  entryFee?: number;
+  expiresAt?: Date;
   actionUrl?: string;
   read: boolean;
   createdAt: Date;
@@ -28,11 +37,19 @@ const notificationSchema = new Schema<NotificationDocument>(
     message: { type: String, required: true },
     type: {
       type: String,
-      enum: ["join_request", "request_accepted", "request_rejected", "payment_confirmed"],
+      enum: ["join_request", "request_accepted", "request_rejected", "payment_confirmed", "request_expired"],
       required: true,
     },
     matchId: { type: String, index: true },
     participantId: { type: String },
+    playerName: { type: String },
+    playerAvatar: { type: String },
+    sport: { type: String },
+    turfName: { type: String },
+    date: { type: String },
+    timeSlot: { type: String },
+    entryFee: { type: Number },
+    expiresAt: { type: Date },
     actionUrl: { type: String },
     read: { type: Boolean, default: false, index: true },
   },
