@@ -19,6 +19,7 @@ import vendorStaffRoutes from "./vendor.staff.routes";
 import vendorMpinRoutes from "./vendor.mpin.routes";
 import vendorChallengesRoutes from "../challenges/vendor.challenges.routes";
 import uploadsRoutes from "../uploads/uploads.routes";
+import vendorCustomSportRoutes from "./vendor.customSport.routes";
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use("/events-dashboard", vendorEventsDashboardRoutes);
 router.use("/coaches-dashboard", vendorCoachesDashboardRoutes);
 router.use("/uploads", uploadsRoutes);
 router.use("/challenges", vendorChallengesRoutes);
+router.use("/custom-sports", vendorCustomSportRoutes);
 
 export default router;
