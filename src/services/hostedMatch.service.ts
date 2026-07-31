@@ -250,7 +250,7 @@ export async function getHostedMatchById(matchId: string): Promise<HostedMatchDo
   return match;
 }
 
-import { createNotification } from "./notification.service";
+import { createNotification, removeNotificationsForParticipant } from "./notification.service";
 
 export async function requestToJoinMatch(
   matchId: string,
@@ -336,6 +336,9 @@ export async function respondToJoinRequest(
   await match.populate("listingId", "title coverImage address city type price");
   const turfTitle = typeof match.listingId === "object" ? (match.listingId as any).title : "Sports Venue";
 
+  // Automatically remove the host's pending "join_request" notification once responded to
+  await removeNotificationsForParticipant(match.matchId, participant.participantId, ["join_request"]).catch(() => {});
+
   let playerOrderId: string | undefined;
 
   if (action === "reject") {
@@ -375,12 +378,12 @@ export async function respondToJoinRequest(
       });
       participant.paymentOrderId = order.providerOrderId;
 
-      // Notify player with Pay Now action and 10m timer
+      // Notify player to complete payment
       await createNotification({
         recipientCustomerId: participant.customerId,
         recipientPhone: participant.phone,
         title: "Request Approved!",
-        message: "Your request has been approved. Complete your payment to confirm your booking.",
+        message: "Your request has been approved. Please complete your payment to confirm your booking.",
         type: "request_accepted",
         matchId: match.matchId,
         participantId: participant.participantId,
@@ -407,7 +410,7 @@ export async function respondToJoinRequest(
         recipientCustomerId: participant.customerId,
         recipientPhone: participant.phone,
         title: "Booking Confirmed",
-        message: "Booking Confirmed. See you on the turf!",
+        message: "Your booking has been confirmed successfully.",
         type: "payment_confirmed",
         matchId: match.matchId,
         participantId: participant.participantId,
@@ -467,13 +470,16 @@ export async function confirmPlayerPayment(
   await match.populate("listingId", "title coverImage address city type price");
   const turfTitle = typeof match.listingId === "object" ? (match.listingId as any).title : "Sports Venue";
 
-  // Notify BOTH player and host that booking is confirmed
+  // Automatically remove the "request_accepted" payment notification from the player's notification list
+  await removeNotificationsForParticipant(match.matchId, participant.participantId, ["request_accepted"]).catch(() => {});
+
+  // Send targeted confirmation notifications to BOTH player and host
   await Promise.all([
     createNotification({
       recipientCustomerId: participant.customerId,
       recipientPhone: participant.phone,
       title: "Booking Confirmed",
-      message: "Booking Confirmed. See you on the turf!",
+      message: "Your booking has been confirmed successfully.",
       type: "payment_confirmed",
       matchId: match.matchId,
       participantId: participant.participantId,
@@ -488,8 +494,8 @@ export async function confirmPlayerPayment(
     createNotification({
       recipientCustomerId: match.hostCustomerId,
       recipientPhone: match.hostPhone,
-      title: "Booking Confirmed",
-      message: `Booking Confirmed. See you on the turf! ${participant.name} paid ₹${match.entryFeePerPlayer}.`,
+      title: "Player Joined Match",
+      message: `${participant.name} has completed the payment and joined your match.`,
       type: "payment_confirmed",
       matchId: match.matchId,
       participantId: participant.participantId,

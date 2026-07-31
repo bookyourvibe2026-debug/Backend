@@ -90,3 +90,16 @@ export async function markAllNotificationsAsRead(
   const res = await NotificationModel.updateMany({ $or: conditions, read: false }, { $set: { read: true } });
   return res.modifiedCount;
 }
+
+export async function removeNotificationsForParticipant(
+  matchId: string,
+  participantId: string,
+  types?: NotificationType[]
+): Promise<number> {
+  const query: any = { matchId, participantId };
+  if (types && types.length > 0) {
+    query.type = { $in: types };
+  }
+  const res = await NotificationModel.deleteMany(query);
+  return res.deletedCount;
+}
