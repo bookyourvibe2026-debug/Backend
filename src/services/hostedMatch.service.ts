@@ -250,6 +250,8 @@ export async function getHostedMatchById(matchId: string): Promise<HostedMatchDo
   return match;
 }
 
+import { createNotification } from "./notification.service";
+
 export async function requestToJoinMatch(
   matchId: string,
   player: { customerId?: string; name: string; phone?: string; email?: string }
@@ -294,6 +296,19 @@ export async function requestToJoinMatch(
   });
 
   await match.save();
+
+  // Send real-time notification to the host
+  await createNotification({
+    recipientCustomerId: match.hostCustomerId,
+    recipientPhone: match.hostPhone,
+    title: "New Join Request",
+    message: `${player.name} requested to join your ${match.sport} match on ${match.date}.`,
+    type: "join_request",
+    matchId: match.matchId,
+    participantId,
+    actionUrl: "/community",
+  }).catch(() => {});
+
   await match.populate("listingId", "title coverImage address city type price");
   return match;
 }
@@ -315,6 +330,18 @@ export async function respondToJoinRequest(
   if (action === "reject") {
     participant.status = "Rejected";
     participant.paymentStatus = "failed";
+
+    // Notify player that request was declined
+    await createNotification({
+      recipientCustomerId: participant.customerId,
+      recipientPhone: participant.phone,
+      title: "Join Request Declined",
+      message: `Your request to join ${match.sport} match on ${match.date} was declined by the host.`,
+      type: "request_rejected",
+      matchId: match.matchId,
+      participantId: participant.participantId,
+      actionUrl: "/community",
+    }).catch(() => {});
   } else if (action === "accept") {
     if (match.entryFeePerPlayer > 0) {
       participant.status = "Payment Pending";
@@ -327,6 +354,18 @@ export async function respondToJoinRequest(
         customerPhone: participant.phone || match.hostPhone,
       });
       participant.paymentOrderId = order.providerOrderId;
+
+      // Notify player to complete payment
+      await createNotification({
+        recipientCustomerId: participant.customerId,
+        recipientPhone: participant.phone,
+        title: "Request Accepted!",
+        message: "Your request has been accepted. Please complete the payment to confirm your booking.",
+        type: "request_accepted",
+        matchId: match.matchId,
+        participantId: participant.participantId,
+        actionUrl: "/community",
+      }).catch(() => {});
     } else {
       participant.status = "Confirmed";
       participant.paymentStatus = "paid";
@@ -336,6 +375,17 @@ export async function respondToJoinRequest(
       if (confirmedCount >= match.maxPlayers) {
         match.status = "Full";
       }
+
+      await createNotification({
+        recipientCustomerId: participant.customerId,
+        recipientPhone: participant.phone,
+        title: "Request Accepted!",
+        message: `Your request has been accepted. You are confirmed for ${match.sport} match!`,
+        type: "payment_confirmed",
+        matchId: match.matchId,
+        participantId: participant.participantId,
+        actionUrl: "/community",
+      }).catch(() => {});
     }
   }
 
@@ -374,6 +424,19 @@ export async function confirmPlayerPayment(
   }
 
   await match.save();
+
+  // Notify host that player has paid & confirmed
+  await createNotification({
+    recipientCustomerId: match.hostCustomerId,
+    recipientPhone: match.hostPhone,
+    title: "Player Payment Confirmed",
+    message: `${participant.name} completed entry fee payment (₹${match.entryFeePerPlayer}) and is confirmed for your ${match.sport} match!`,
+    type: "payment_confirmed",
+    matchId: match.matchId,
+    participantId: participant.participantId,
+    actionUrl: "/community",
+  }).catch(() => {});
+
   await match.populate("listingId", "title coverImage address city type price");
   return match;
 }

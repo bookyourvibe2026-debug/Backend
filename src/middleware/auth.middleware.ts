@@ -45,3 +45,18 @@ export function requireRole(...roles: string[]) {
     next();
   };
 }
+
+export function optionalAuth(audience: Audience) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    const token = extractBearerToken(req);
+    if (!token) {
+      next();
+      return;
+    }
+    try {
+      const payload = verifyAccessToken(token, audience);
+      req.auth = payload;
+    } catch (_) {}
+    next();
+  };
+}
