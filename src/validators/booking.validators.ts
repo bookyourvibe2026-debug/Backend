@@ -35,17 +35,18 @@ export const confirmPaymentSchema = z.object({
 
 export const createManualBookingSchema = z.object({
   listingId: objectId,
-  customerName: z.string().trim().min(2).max(120),
-  phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+  customerName: z.string().trim().min(1).max(120).optional(),
+  phone: z.string().trim().optional(),
   sport: z.string().trim().max(60).optional(),
   courtId: z.string().trim().max(60).optional(),
   numberOfPlayers: z.coerce.number().int().min(1).max(200).optional(),
   foodIncluded: z.boolean().optional(),
   dateTime: z.coerce.date(),
   endTime: z.string().trim().regex(/^\d{2}:\d{2}$/).optional(),
-  totalAmount: z.coerce.number().positive(),
+  bookingType: z.enum(["regular", "club_together", "offline"]).optional(),
+  totalAmount: z.coerce.number().min(0),
   paidAmount: z.coerce.number().min(0).optional(),
-  payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]),
+  payment: z.enum(["Cashfree (Online)", "Cash (Offline)", "UPI"]).optional().default("Cash (Offline)"),
   status: z.enum(["Confirmed", "Pending", "Cancelled", "Completed", "Part Paid"]).default("Confirmed"),
 });
 
