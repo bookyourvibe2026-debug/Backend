@@ -6,6 +6,7 @@ import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
 import { activeBoostPct, boostedPrice } from "./lastMinBoost.service";
 import { paymentProvider } from "./payment/payment.service";
+import { invalidatePublicListingCache } from "./listing.service";
 
 interface PricingResult {
   totalAmount: number;
@@ -227,16 +228,23 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         if (sEnd <= sStart) sEnd += 1440;
         const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
         if (overlap > 0) {
+          const slotHours = Math.max(1, (sEnd - sStart) / 60);
+          const hourlyRate = s.isClubSlot ? s.price / slotHours : s.price;
           coveredMin += overlap;
-          weightedSum += overlap * s.price;
+          weightedSum += overlap * hourlyRate;
         }
       }
       if (coveredMin > 0) {
         baseHourlyRate = Math.round(weightedSum / coveredMin);
       } else {
-        // Nothing configured actually covers this window — fall back to the day's
-        // average rather than hard-rejecting a booking outside the configured slots.
-        const sum = slots.reduce((acc, s) => acc + s.price, 0);
+        // Nothing configured actually covers this window — fall back to the day's average.
+        const sum = slots.reduce((acc, s) => {
+          const sStart = timeToMinutes(s.startTime);
+          let sEnd = timeToMinutes(s.endTime);
+          if (sEnd <= sStart) sEnd += 1440;
+          const slotHours = Math.max(1, (sEnd - sStart) / 60);
+          return acc + (s.isClubSlot ? s.price / slotHours : s.price);
+        }, 0);
         baseHourlyRate = Math.round(sum / slots.length);
       }
     }
@@ -334,7 +342,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     throw ApiError.badRequest("This listing is not yet assigned to a vendor and cannot accept bookings");
   }
 
-  return BookingModel.create({
+  const created = await BookingModel.create({
     orderId,
     listingId: listing._id,
     vendorId: listing.vendorId,
@@ -364,6 +372,8 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     paymentStatus: "pending",
     status: "Pending",
   });
+  invalidatePublicListingCache();
+  return created;
 }
 
 export async function confirmBookingPayment(orderId: string, customerId?: string, paymentId?: string): Promise<BookingDocument> {

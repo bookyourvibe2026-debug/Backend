@@ -43,12 +43,17 @@ export interface Coupon {
 }
 
 export interface TurfSlot {
+  id?: string;
   startTime: string;
   endTime: string;
   label: string;
   price: number;
   blocked?: boolean;
   blockedReason?: string;
+  isClubSlot?: boolean;
+  clubId?: string;
+  slotIds?: string[];
+  durationMinutes?: number;
 }
 
 export interface DateOverride {
@@ -218,12 +223,17 @@ const courtSchema = new Schema<Court>(
 
 const turfSlotSchema = new Schema<TurfSlot>(
   {
+    id: { type: String },
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
     label: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
     blocked: { type: Boolean, default: false },
     blockedReason: { type: String },
+    isClubSlot: { type: Boolean, default: false },
+    clubId: { type: String },
+    slotIds: { type: [String], default: [] },
+    durationMinutes: { type: Number },
   },
   { _id: false }
 );
