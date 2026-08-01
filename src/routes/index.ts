@@ -17,6 +17,7 @@ import tournamentsRoutes from "../modules/tournaments/tournaments.routes";
 import customerTournamentsRoutes from "../modules/tournaments/customer.tournaments.routes";
 import vendorRoutes from "../modules/vendor/vendor.routes";
 import venuesRoutes from "../modules/venues/venues.routes";
+import analyticsRoutes from "../modules/analytics/analytics.routes";
 
 const router = Router();
 
@@ -41,6 +42,7 @@ router.use("/coach-subscriptions", customerCoachesRoutes);
 router.use("/tournaments", tournamentsRoutes);
 router.use("/tournament-registrations", customerTournamentsRoutes);
 router.use("/food", foodRoutes);
+router.use("/analytics", analyticsRoutes);
 
 router.use("/vendor", vendorRoutes);
 router.use("/admin", adminRoutes);
