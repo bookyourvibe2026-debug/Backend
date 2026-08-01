@@ -438,6 +438,7 @@ export async function createManualBooking(vendorId: string, input: CreateManualB
     phone,
     sport: input.sport,
     courtId: court?.id,
+    courtIds: court?.id ? [court.id] : [],
     courtName: court?.name,
     numberOfPlayers: input.numberOfPlayers,
     foodIncluded: input.foodIncluded,
