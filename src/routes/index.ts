@@ -18,6 +18,7 @@ import customerTournamentsRoutes from "../modules/tournaments/customer.tournamen
 import vendorRoutes from "../modules/vendor/vendor.routes";
 import venuesRoutes from "../modules/venues/venues.routes";
 import analyticsRoutes from "../modules/analytics/analytics.routes";
+import { leaderboardRoutes } from "../modules/leaderboard/leaderboard.routes";
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use("/tournaments", tournamentsRoutes);
 router.use("/tournament-registrations", customerTournamentsRoutes);
 router.use("/food", foodRoutes);
 router.use("/analytics", analyticsRoutes);
+router.use("/leaderboard", leaderboardRoutes);
 
 router.use("/vendor", vendorRoutes);
 router.use("/admin", adminRoutes);
