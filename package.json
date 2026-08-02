@@ -16,7 +16,8 @@
     "lint": "eslint \"src/**/*.ts\"",
     "seed": "tsx src/seed/seed.ts",
     "seed:listing": "tsx src/seed/seedSampleListing.ts",
-    "seed:foodMenu": "tsx src/seed/seedFoodMenu.ts"
+    "seed:foodMenu": "tsx src/seed/seedFoodMenu.ts",
+    "seed:refresh": "tsx src/seed/refreshData.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

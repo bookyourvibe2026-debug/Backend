@@ -56,7 +56,9 @@ export function optionalAuth(audience: Audience) {
     try {
       const payload = verifyAccessToken(token, audience);
       req.auth = payload;
-    } catch (_) {}
+    } catch (_) {
+      // ignore
+    }
     next();
   };
 }
