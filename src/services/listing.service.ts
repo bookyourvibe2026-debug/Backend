@@ -48,7 +48,7 @@ export async function findPublicListings(query: ListingQuery) {
 
     const skip = (query.page - 1) * query.limit;
     const [items, total] = await Promise.all([
-      ListingModel.find(filter).sort({ trending: -1, createdAt: -1 }).skip(skip).limit(query.limit),
+      ListingModel.find(filter).sort({ trending: -1, createdAt: -1 }).skip(skip).limit(query.limit).lean(),
       ListingModel.countDocuments(filter),
     ]);
 
@@ -59,12 +59,12 @@ export async function findPublicListings(query: ListingQuery) {
 export async function findPublicListingById(id: string) {
   return cached(`${PUBLIC_CACHE_PREFIX}byId:${id}`, PUBLIC_CACHE_TTL_MS, async () => {
     const query = Types.ObjectId.isValid(id) ? { _id: id } : { slug: id.toLowerCase() };
-    const listing = await ListingModel.findOne({ ...query, status: "Active", isPrivate: false });
+    const listing = await ListingModel.findOne({ ...query, status: "Active", isPrivate: false }).lean();
     if (!listing) throw ApiError.notFound("Listing not found");
 
     if (listing.type === "Event" && listing.capacity) {
       const taken = await BookingModel.countDocuments({ listingId: listing._id, status: { $ne: "Cancelled" } });
-      return { ...listing.toObject(), spotsLeft: Math.max(listing.capacity - taken, 0) };
+      return { ...listing, spotsLeft: Math.max(listing.capacity - taken, 0) };
     }
 
     return listing;
@@ -133,7 +133,7 @@ export async function findVenueRankings(query: RankingQuery) {
       isPrivate: false,
       type: { $in: ["Turf", "Game"] },
       city: new RegExp(`^${escapeRegex(query.city)}$`, "i"),
-    }).select("title slug city address coverImage images price categories tags");
+    }).select("title slug city address coverImage images price categories tags").lean();
 
     // Every area in the city, so the filter offers real choices rather than a guess.
     const areas = Array.from(
@@ -185,9 +185,9 @@ export async function findVenueRankings(query: RankingQuery) {
 
 export async function findPublicVendorProfile(vendorId: string) {
   return cached(`${PUBLIC_CACHE_PREFIX}vendor:${vendorId}`, PUBLIC_CACHE_TTL_MS, async () => {
-    const vendor = await VendorModel.findOne({ _id: vendorId, status: "approved" }).select(
-      "businessName ownerName logo banner poster city state"
-    );
+    const vendor = await VendorModel.findOne({ _id: vendorId, status: "approved" })
+      .select("businessName ownerName logo banner poster city state")
+      .lean();
     if (!vendor) throw ApiError.notFound("Vendor not found");
 
     const listings = await ListingModel.find({
@@ -195,7 +195,7 @@ export async function findPublicVendorProfile(vendorId: string) {
       status: "Active",
       isPrivate: false,
       type: { $in: ["Turf", "Game"] },
-    }).sort({ trending: -1, createdAt: -1 });
+    }).sort({ trending: -1, createdAt: -1 }).lean();
 
     return { vendor, listings };
   });

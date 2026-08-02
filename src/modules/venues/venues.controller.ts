@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { findPublicListingById, findPublicListings, findPublicVendorProfile, findVenueRankings } from "../../services/listing.service";
+import { findPublicListingById, findPublicListings, findPublicVendorProfile, findVenueRankings, invalidatePublicListingCache } from "../../services/listing.service";
 import { getBookedRangesForDate } from "../../services/booking.service";
+import { ReviewModel } from "../../models/Review.model";
+import { ListingModel } from "../../models/Listing.model";
 
 /** Let the browser/CDN reuse public reads for a short window (matches the in-memory cache TTL). */
 const PUBLIC_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=60";
@@ -58,4 +60,46 @@ export const getVendorProfile = asyncHandler(async (req: Request, res: Response)
   const profile = await findPublicVendorProfile(req.params.vendorId!);
   res.set("Cache-Control", PUBLIC_CACHE_CONTROL);
   sendSuccess(res, 200, profile);
+});
+
+export const getVenueReviews = asyncHandler(async (req: Request, res: Response) => {
+  const listing = await findPublicListingById(req.params.id!);
+  const reviews = await ReviewModel.find({ listingId: listing._id }).sort({ createdAt: -1 });
+  sendSuccess(res, 200, reviews);
+});
+
+export const addVenueReview = asyncHandler(async (req: Request, res: Response) => {
+  const listing = await findPublicListingById(req.params.id!);
+  const { customerName, rating, comment } = req.body;
+
+  const review = await ReviewModel.create({
+    listingId: listing._id,
+    customerName,
+    rating,
+    comment,
+  });
+
+  // Calculate new stats
+  const stats = await ReviewModel.aggregate([
+    { $match: { listingId: listing._id } },
+    {
+      $group: {
+        _id: null,
+        avgRating: { $avg: "$rating" },
+        totalReviews: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const avgRating = stats[0] ? Math.round(stats[0].avgRating * 10) / 10 : 0;
+  const totalReviews = stats[0] ? stats[0].totalReviews : 0;
+
+  await ListingModel.updateOne(
+    { _id: listing._id },
+    { rating: avgRating, reviewCount: totalReviews }
+  );
+
+  invalidatePublicListingCache();
+
+  sendSuccess(res, 201, review);
 });

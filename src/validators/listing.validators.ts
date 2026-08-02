@@ -161,3 +161,9 @@ export const publicListingQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(20),
 });
+
+export const createReviewSchema = z.object({
+  customerName: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
+  rating: z.coerce.number().int().min(1, "Rating must be at least 1").max(5, "Rating cannot be above 5"),
+  comment: z.string().trim().min(5, "Review comment must be at least 5 characters").max(1000),
+});

@@ -187,6 +187,8 @@ export interface ListingDocument {
   lastMinBoost?: LastMinBoost;
   /** Mandatory partial payment configuration set by venue owner. */
   partialPayment?: PartialPaymentConfig;
+  rating: number;
+  reviewCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -318,6 +320,8 @@ const listingSchema = new Schema<ListingDocument>(
     dateOverrides: { type: [dateOverrideSchema], default: [] },
     lastMinBoost: { type: lastMinBoostSchema, required: false },
     partialPayment: { type: partialPaymentSchema, default: () => ({ enabled: true, type: "percentage", value: 25 }) },
+    rating: { type: Number, default: 0 },
+    reviewCount: { type: Number, default: 0 },
     technicalSpecs: {
       type: [
         new Schema<TechnicalSpec>(

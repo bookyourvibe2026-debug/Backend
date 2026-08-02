@@ -6,8 +6,17 @@ import {
   publicListingQuerySchema,
   rankingsQuerySchema,
   vendorIdParamSchema,
+  createReviewSchema,
 } from "../../validators/listing.validators";
-import { browseVenues, getVendorProfile, getVenueAvailability, getVenueById, getVenueRankings } from "./venues.controller";
+import {
+  browseVenues,
+  getVendorProfile,
+  getVenueAvailability,
+  getVenueById,
+  getVenueRankings,
+  getVenueReviews,
+  addVenueReview,
+} from "./venues.controller";
 
 const router = Router();
 
@@ -16,6 +25,8 @@ router.get("/", validate({ query: publicListingQuerySchema }), browseVenues);
 router.get("/rankings", validate({ query: rankingsQuerySchema }), getVenueRankings);
 router.get("/vendors/:vendorId", validate({ params: vendorIdParamSchema }), getVendorProfile);
 router.get("/:id/availability", validate({ params: listingIdParamSchema, query: availabilityQuerySchema }), getVenueAvailability);
+router.get("/:id/reviews", validate({ params: listingIdParamSchema }), getVenueReviews);
+router.post("/:id/reviews", validate({ params: listingIdParamSchema, body: createReviewSchema }), addVenueReview);
 router.get("/:id", validate({ params: listingIdParamSchema }), getVenueById);
 
 export default router;
