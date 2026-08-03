@@ -17,6 +17,7 @@ import tournamentsRoutes from "../modules/tournaments/tournaments.routes";
 import customerTournamentsRoutes from "../modules/tournaments/customer.tournaments.routes";
 import vendorRoutes from "../modules/vendor/vendor.routes";
 import venuesRoutes from "../modules/venues/venues.routes";
+import dealsRoutes from "../modules/deals/deals.routes";
 import analyticsRoutes from "../modules/analytics/analytics.routes";
 import { leaderboardRoutes } from "../modules/leaderboard/leaderboard.routes";
 
@@ -31,6 +32,7 @@ router.use("/auth/vendor", vendorAuthRoutes);
 router.use("/auth/admin", adminAuthRoutes);
 
 router.use("/venues", venuesRoutes);
+router.use("/deals", dealsRoutes);
 router.use("/site-appearance", appearanceRoutes);
 router.use("/blog", blogRoutes);
 router.use("/banners", bannerRoutes);

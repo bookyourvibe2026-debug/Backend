@@ -105,18 +105,26 @@ export interface CourtSportPrice {
 }
 
 /**
- * Last Min Boost — a standing rule that discounts specific slots only inside a short
- * window before they start, to fill them at the last minute.
+ * Last Min Boost — a standing rule that discounts one Sport + Court + Slot combination
+ * only inside a short window before the slot starts, to fill it at the last minute.
  *
  * The rule is keyed by slot start time rather than by date, so it applies every day:
  * a slot only carries the discount while it is still unbooked AND the clock is inside
  * `triggerMins` of its start. Nothing is written into slot prices — the discount is
  * derived on read, which is what makes the trigger window mean anything.
+ *
+ * A listing can carry several of these at once (e.g. Cricket on Court 3 boosted
+ * differently from Football on Court 5) — each is independent and shows as its own
+ * deal card. Omitting `courtId` means the rule applies to every active court that
+ * hosts `game`.
  */
-export interface LastMinBoost {
+export interface LastMinuteBoostRule {
+  id: string;
   enabled: boolean;
   /** Sport label the boost applies to, matching what a booking sends as `sport`. */
   game: string;
+  /** Specific court this rule targets. Absent = every active court hosting `game`. */
+  courtId?: string;
   /** Slot start times in "HH:mm" that the vendor opted into. */
   slotStarts: string[];
   /** 10-30. Enforced by the validator and clamped again on read. */
@@ -183,8 +191,8 @@ export interface ListingDocument {
   slotsList: TurfSlot[];
   dailyRoutine: boolean;
   dateOverrides: DateOverride[];
-  /** Absent on listings the vendor has never configured a boost for. */
-  lastMinBoost?: LastMinBoost;
+  /** Empty on listings the vendor has never configured a boost for. */
+  lastMinBoosts: LastMinuteBoostRule[];
   /** Mandatory partial payment configuration set by venue owner. */
   partialPayment?: PartialPaymentConfig;
   rating: number;
@@ -240,10 +248,12 @@ const turfSlotSchema = new Schema<TurfSlot>(
   { _id: false }
 );
 
-const lastMinBoostSchema = new Schema<LastMinBoost>(
+const lastMinuteBoostRuleSchema = new Schema<LastMinuteBoostRule>(
   {
+    id: { type: String, required: true },
     enabled: { type: Boolean, default: false },
     game: { type: String, default: "" },
+    courtId: { type: String },
     slotStarts: { type: [String], default: [] },
     discountPct: { type: Number, min: 10, max: 30, default: 10 },
     triggerMins: { type: Number, min: 1, max: 240, default: 10 },
@@ -318,7 +328,7 @@ const listingSchema = new Schema<ListingDocument>(
     slotsList: { type: [turfSlotSchema], default: [] },
     dailyRoutine: { type: Boolean, default: true },
     dateOverrides: { type: [dateOverrideSchema], default: [] },
-    lastMinBoost: { type: lastMinBoostSchema, required: false },
+    lastMinBoosts: { type: [lastMinuteBoostRuleSchema], default: [] },
     partialPayment: { type: partialPaymentSchema, default: () => ({ enabled: true, type: "percentage", value: 25 }) },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },

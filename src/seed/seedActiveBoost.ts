@@ -34,13 +34,17 @@ async function main() {
     });
   }
 
-  listing.lastMinBoost = {
-    enabled: true,
-    game: listing.categories[0] || "Cricket",
-    slotStarts: [slotStart],
-    discountPct: 20,
-    triggerMins: 120
-  };
+  listing.lastMinBoosts = [
+    ...(listing.lastMinBoosts ?? []),
+    {
+      id: `boost-${Date.now()}`,
+      enabled: true,
+      game: listing.categories[0] || "Cricket",
+      slotStarts: [slotStart],
+      discountPct: 20,
+      triggerMins: 120,
+    },
+  ];
 
   // Mark the listing cover image to mock if not present
   if (!listing.coverImage) {

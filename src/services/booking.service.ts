@@ -4,7 +4,7 @@ import { BookingDocument, BookingModel } from "../models/Booking.model";
 import { Court, ListingModel } from "../models/Listing.model";
 import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
-import { activeBoostPct, boostedPrice } from "./lastMinBoost.service";
+import { boostedPrice, clampBoostPct, findActiveBoostRule } from "./lastMinBoost.service";
 import { paymentProvider } from "./payment/payment.service";
 import { invalidatePublicListingCache } from "./listing.service";
 
@@ -155,7 +155,7 @@ export function courtHourlyRate(_court: Court | undefined, slotRate: number): nu
   return slotRate;
 }
 
-function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+export function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
   // Ranges crossing midnight (end <= start) extend into the next day.
   const aE = aEnd <= aStart ? aEnd + 1440 : aEnd;
   const bE = bEnd <= bStart ? bEnd + 1440 : bEnd;
@@ -168,6 +168,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
 
   let baseAmount = listing.price;
   let selectedCourts: Court[] = [];
+  let appliedBoost: { ruleId: string; discountPct: number; originalAmount: number; discountAmount: number } | undefined;
   const selectedPriceTier = input.priceTierId ? listing.priceTiers.find((t) => t.id === input.priceTierId) : undefined;
   if (input.priceTierId && !selectedPriceTier) {
     throw ApiError.badRequest("Selected price tier is not valid for this listing");
@@ -266,13 +267,23 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     // pick up the discount on *tomorrow's* 6 PM slot too.
     const nowIst = new Date();
     if (dateStr === nowIst.toLocaleDateString("en-CA", { timeZone: IST })) {
-      const boostPct = activeBoostPct(
-        listing.lastMinBoost,
+      const boostRule = findActiveBoostRule(
+        listing.lastMinBoosts,
         startTime,
         timeToMinutes(istTimeHHmm(nowIst)),
-        input.sport
+        input.sport,
+        selectedCourts[0]?.id
       );
-      if (boostPct > 0) baseAmount = boostedPrice(baseAmount, boostPct);
+      if (boostRule) {
+        const originalAmount = baseAmount;
+        baseAmount = boostedPrice(baseAmount, boostRule.discountPct);
+        appliedBoost = {
+          ruleId: boostRule.id,
+          discountPct: clampBoostPct(boostRule.discountPct),
+          originalAmount,
+          discountAmount: originalAmount - baseAmount,
+        };
+      }
     }
 
     // Also honour slots the vendor has blocked (maintenance etc.) for this date.
@@ -371,6 +382,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     paymentOrderId,
     paymentStatus: "pending",
     status: "Pending",
+    lastMinuteBoost: appliedBoost,
   });
   invalidatePublicListingCache();
   return created;

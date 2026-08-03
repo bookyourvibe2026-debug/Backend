@@ -37,6 +37,13 @@ export interface BookingDocument {
   taxes: number;
   affiliateAmount: number;
   vendorEarning: number;
+  /** Set when a Last Minute Boost rule discounted this booking, for receipt/history display. */
+  lastMinuteBoost?: {
+    ruleId: string;
+    discountPct: number;
+    originalAmount: number;
+    discountAmount: number;
+  };
   payment: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentOrderId?: string;
@@ -77,6 +84,18 @@ const bookingSchema = new Schema<BookingDocument>(
     taxes: { type: Number, required: true, min: 0, default: 0 },
     affiliateAmount: { type: Number, required: true, min: 0, default: 0 },
     vendorEarning: { type: Number, required: true, min: 0, default: 0 },
+    lastMinuteBoost: {
+      type: new Schema(
+        {
+          ruleId: { type: String, required: true },
+          discountPct: { type: Number, required: true },
+          originalAmount: { type: Number, required: true },
+          discountAmount: { type: Number, required: true },
+        },
+        { _id: false }
+      ),
+      required: false,
+    },
     payment: { type: String, enum: ["Cashfree (Online)", "Cash (Offline)", "UPI"], required: true },
     paymentStatus: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
     paymentOrderId: { type: String },

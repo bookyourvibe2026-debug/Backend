@@ -21,10 +21,16 @@ const courtSchema = z.object({
   active: z.boolean().default(true),
 });
 
-/** Last Min Boost. The 10-30% band is the product rule, enforced here rather than in the UI alone. */
-const lastMinBoostSchema = z.object({
+/**
+ * Last Minute Boost rule. The 10-30% band is the product rule, enforced here rather than
+ * in the UI alone. A listing carries an array of these — one per Sport + Court + Slot
+ * combination the vendor has boosted; `courtId` absent means "every court hosting `game`".
+ */
+const lastMinuteBoostRuleSchema = z.object({
+  id: z.string().min(1),
   enabled: z.boolean(),
   game: z.string().trim().max(60),
+  courtId: z.string().min(1).optional(),
   slotStarts: z.array(z.string().regex(/^\d{2}:\d{2}$/, "Slot start must be HH:mm")).max(48),
   discountPct: z.number().int().min(10, "Discount cannot be below 10%").max(30, "Discount cannot be above 30%"),
   triggerMins: z.number().int().min(1).max(240),
@@ -91,7 +97,7 @@ export const createListingSchema = z.object({
     )
     .optional(),
   dailyRoutine: z.boolean().optional(),
-  lastMinBoost: lastMinBoostSchema.optional(),
+  lastMinBoosts: z.array(lastMinuteBoostRuleSchema).max(50).optional(),
   partialPayment: partialPaymentSchema.optional(),
   dateOverrides: z
     .array(

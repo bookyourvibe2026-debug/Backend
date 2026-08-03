@@ -95,10 +95,11 @@ export async function createHostedMatch(
     const nowIst = new Date();
     if (dateStr === nowIst.toLocaleDateString("en-CA", { timeZone: IST })) {
       const boostPct = activeBoostPct(
-        listing.lastMinBoost,
+        listing.lastMinBoosts,
         startTime,
         timeToMinutes(istTimeHHmm(nowIst)),
-        input.sport
+        input.sport,
+        selectedCourt?.id
       );
       if (boostPct > 0) baseAmount = boostedPrice(baseAmount, boostPct);
     }
