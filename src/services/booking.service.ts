@@ -295,9 +295,10 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         `This time is unavailable — the venue has blocked ${blockedClash.startTime} - ${blockedClash.endTime}.`
       );
     }
-    if (selectedPriceTier) {
-      baseAmount = selectedPriceTier.amount;
-    }
+    // Turf pricing is always driven by the selected slot(s)/court(s) — never by a
+    // package tier — matching booking-flow.tsx's own activePrice logic. Applying the
+    // tier here would silently overwrite the slot rate (and any Last Min Boost
+    // discount just applied above) with the flat, undiscounted tier price.
   } else if (selectedPriceTier) {
     baseAmount = selectedPriceTier.amount;
   }
