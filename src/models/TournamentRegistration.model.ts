@@ -61,6 +61,7 @@ const tournamentRegistrationSchema = new Schema<TournamentRegistrationDocument>(
 );
 
 tournamentRegistrationSchema.index({ vendorId: 1, createdAt: -1 });
+tournamentRegistrationSchema.index({ tournamentId: 1, status: 1 });
 
 export const TournamentRegistrationModel = model<TournamentRegistrationDocument>(
   "TournamentRegistration",

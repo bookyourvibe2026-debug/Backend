@@ -64,7 +64,7 @@ export const getVendorProfile = asyncHandler(async (req: Request, res: Response)
 
 export const getVenueReviews = asyncHandler(async (req: Request, res: Response) => {
   const listing = await findPublicListingById(req.params.id!);
-  const reviews = await ReviewModel.find({ listingId: listing._id }).sort({ createdAt: -1 });
+  const reviews = await ReviewModel.find({ listingId: listing._id }).sort({ createdAt: -1 }).lean();
   sendSuccess(res, 200, reviews);
 });
 

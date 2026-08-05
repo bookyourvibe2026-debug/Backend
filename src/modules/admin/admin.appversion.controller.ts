@@ -4,7 +4,7 @@ import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 
 export const listAppVersions = asyncHandler(async (_req: Request, res: Response) => {
-  const configs = await AppVersionConfigModel.find();
+  const configs = await AppVersionConfigModel.find().lean();
   sendSuccess(res, 200, configs);
 });
 

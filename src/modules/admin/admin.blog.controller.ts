@@ -5,7 +5,7 @@ import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 
 export const listBlogPosts = asyncHandler(async (_req: Request, res: Response) => {
-  const posts = await BlogPostModel.find().sort({ createdAt: -1 });
+  const posts = await BlogPostModel.find().sort({ createdAt: -1 }).lean();
   sendSuccess(res, 200, posts);
 });
 

@@ -183,11 +183,11 @@ export async function createChallenge(
 }
 
 export async function getChallengeByCode(code: string) {
-  const doc = await ChallengeModel.findOne({ code: code.toUpperCase() });
+  const doc = await ChallengeModel.findOne({ code: code.toUpperCase() }).lean();
   if (!doc) throw ApiError.notFound("Challenge not found");
   const [challenger, opponent] = await Promise.all([
-    CustomerModel.findById(doc.challengerId).select("name phone avatarUrl"),
-    doc.opponentId ? CustomerModel.findById(doc.opponentId).select("name phone avatarUrl") : null,
+    CustomerModel.findById(doc.challengerId).select("name phone avatarUrl").lean(),
+    doc.opponentId ? CustomerModel.findById(doc.opponentId).select("name phone avatarUrl").lean() : null,
   ]);
   return buildChallengeResponse(doc, challenger, opponent, DEFAULT_INVITE_BASE_URL);
 }

@@ -83,7 +83,10 @@ interface LeaderboardEntry {
 }
 
 /** Always derived from fixtures + registrations — never stored, so it can't drift out of sync. */
-function computeLeaderboard(tournament: TournamentDocument, registrations: TournamentRegistrationDocument[]): LeaderboardEntry[] {
+function computeLeaderboard(
+  tournament: { fixtures: TournamentFixture[] },
+  registrations: { _id: Types.ObjectId; teamName: string; status: string }[]
+): LeaderboardEntry[] {
   const table = new Map<string, LeaderboardEntry>();
   for (const reg of registrations) {
     if (reg.status !== "Registered") continue;
@@ -126,13 +129,15 @@ function computeLeaderboard(tournament: TournamentDocument, registrations: Tourn
 }
 
 export async function getPublicTournamentById(tournamentId: string) {
-  const tournament = await TournamentModel.findOne({ _id: tournamentId, status: { $ne: "Cancelled" } });
+  const tournament = await TournamentModel.findOne({ _id: tournamentId, status: { $ne: "Cancelled" } }).lean();
   if (!tournament) throw ApiError.notFound("Tournament not found");
 
-  const registrations = await TournamentRegistrationModel.find({ tournamentId: tournament._id, status: "Registered" });
+  const registrations = await TournamentRegistrationModel.find({ tournamentId: tournament._id, status: "Registered" })
+    .select("teamName status")
+    .lean();
 
   return {
-    ...tournament.toObject(),
+    ...tournament,
     spotsLeft: tournament.maxTeams ? Math.max(tournament.maxTeams - tournament.registeredTeamsCount, 0) : undefined,
     leaderboard: computeLeaderboard(tournament, registrations),
   };

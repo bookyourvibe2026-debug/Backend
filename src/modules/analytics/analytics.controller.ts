@@ -8,6 +8,10 @@ import { FoodOrderModel } from "../../models/FoodOrder.model";
 import { PriceHistory } from "../../models/PriceHistory.model";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import { cached } from "../../utils/cache";
+
+const EXECUTIVE_DASHBOARD_CACHE_KEY = "analytics:executive-dashboard";
+const EXECUTIVE_DASHBOARD_CACHE_TTL_MS = 20_000;
 
 export async function trackEvent(req: Request, res: Response, next: NextFunction) {
   try {
@@ -64,59 +68,64 @@ export async function getAnalyticsSummary(req: Request, res: Response, next: Nex
   }
 }
 
+async function computeExecutiveDashboard() {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const [
+    weeklyBookings,
+    weeklySignups,
+    activeVenuesCount,
+    totalGMVResult,
+    totalFoodRevenueResult,
+    totalCustomersCount,
+    confirmedBookingsCount,
+    totalBookingsCount,
+  ] = await Promise.all([
+    BookingModel.countDocuments({ createdAt: { $gte: oneWeekAgo }, status: "Confirmed" }),
+    CustomerModel.countDocuments({ createdAt: { $gte: oneWeekAgo } }),
+    VendorModel.countDocuments({ status: "approved" }),
+    BookingModel.aggregate([
+      { $match: { status: "Confirmed" } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
+    ]),
+    FoodOrderModel.aggregate([
+      { $match: { status: "completed" } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    CustomerModel.countDocuments({}),
+    BookingModel.countDocuments({ status: "Confirmed" }),
+    BookingModel.countDocuments({}),
+  ]);
+
+  const gmv = totalGMVResult[0]?.total || 0;
+  const foodRevenue = totalFoodRevenueResult[0]?.total || 0;
+  const netRevenue = Math.round(gmv * 0.15 + foodRevenue * 0.2); // 15% booking commission + 20% food margin
+  const arpu = totalCustomersCount > 0 ? Math.round(gmv / totalCustomersCount) : 0;
+  const paymentSuccessRate = totalBookingsCount > 0 ? Math.round((confirmedBookingsCount / totalBookingsCount) * 100) : 98;
+  const occupancyRate = 42; // Calculated average occupancy rate across venues %
+
+  return {
+    weeklyCompletedGames: weeklyBookings,
+    weeklyActiveUsers: Math.max(weeklySignups * 3, weeklyBookings),
+    weeklySignups,
+    activeVenues: activeVenuesCount,
+    gmv,
+    netRevenue,
+    arpu,
+    foodRevenue,
+    paymentSuccessRate,
+    occupancyRate,
+    playerRetentionRate: 68, // Month-1 player retention percentage
+    ownerRetentionRate: 94,  // Owner retention percentage
+    ltvToCacRatio: "4.2x",
+  };
+}
+
 export async function getExecutiveDashboard(_req: Request, res: Response, next: NextFunction) {
   try {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-    const [
-      weeklyBookings,
-      weeklySignups,
-      activeVenuesCount,
-      totalGMVResult,
-      totalFoodRevenueResult,
-      totalCustomersCount,
-      confirmedBookingsCount,
-      totalBookingsCount,
-    ] = await Promise.all([
-      BookingModel.countDocuments({ createdAt: { $gte: oneWeekAgo }, status: "Confirmed" }),
-      CustomerModel.countDocuments({ createdAt: { $gte: oneWeekAgo } }),
-      VendorModel.countDocuments({ status: "approved" }),
-      BookingModel.aggregate([
-        { $match: { status: "Confirmed" } },
-        { $group: { _id: null, total: { $sum: "$totalPrice" } } },
-      ]),
-      FoodOrderModel.aggregate([
-        { $match: { status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
-      ]),
-      CustomerModel.countDocuments({}),
-      BookingModel.countDocuments({ status: "Confirmed" }),
-      BookingModel.countDocuments({}),
-    ]);
-
-    const gmv = totalGMVResult[0]?.total || 0;
-    const foodRevenue = totalFoodRevenueResult[0]?.total || 0;
-    const netRevenue = Math.round(gmv * 0.15 + foodRevenue * 0.2); // 15% booking commission + 20% food margin
-    const arpu = totalCustomersCount > 0 ? Math.round(gmv / totalCustomersCount) : 0;
-    const paymentSuccessRate = totalBookingsCount > 0 ? Math.round((confirmedBookingsCount / totalBookingsCount) * 100) : 98;
-    const occupancyRate = 42; // Calculated average occupancy rate across venues %
-
-    return sendSuccess(res, 200, {
-      weeklyCompletedGames: weeklyBookings,
-      weeklyActiveUsers: Math.max(weeklySignups * 3, weeklyBookings),
-      weeklySignups,
-      activeVenues: activeVenuesCount,
-      gmv,
-      netRevenue,
-      arpu,
-      foodRevenue,
-      paymentSuccessRate,
-      occupancyRate,
-      playerRetentionRate: 68, // Month-1 player retention percentage
-      ownerRetentionRate: 94,  // Owner retention percentage
-      ltvToCacRatio: "4.2x",
-    }, "Executive dashboard metrics calculated successfully");
+    const payload = await cached(EXECUTIVE_DASHBOARD_CACHE_KEY, EXECUTIVE_DASHBOARD_CACHE_TTL_MS, computeExecutiveDashboard);
+    return sendSuccess(res, 200, payload, "Executive dashboard metrics calculated successfully");
   } catch (error) {
     next(error);
   }

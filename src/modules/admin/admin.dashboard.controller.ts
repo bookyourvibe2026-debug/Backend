@@ -6,6 +6,10 @@ import { ListingModel } from "../../models/Listing.model";
 import { VendorModel } from "../../models/Vendor.model";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { cached } from "../../utils/cache";
+
+const ADMIN_DASHBOARD_CACHE_KEY = "admin:dashboard";
+const ADMIN_DASHBOARD_CACHE_TTL_MS = 20_000;
 
 async function growthStats<T>(model: mongoose.Model<T>) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -18,7 +22,7 @@ async function growthStats<T>(model: mongoose.Model<T>) {
   return { total, last30Days, growthPercent };
 }
 
-export const getAdminDashboard = asyncHandler(async (_req: Request, res: Response) => {
+async function computeAdminDashboard() {
   const [
     vendorsByStatus,
     bookingsByStatus,
@@ -53,13 +57,14 @@ export const getAdminDashboard = asyncHandler(async (_req: Request, res: Respons
       .sort({ createdAt: -1 })
       .limit(6)
       .populate("listingId", "title")
-      .select("orderId customerName status dateTime listingId"),
+      .select("orderId customerName status dateTime listingId")
+      .lean(),
     growthStats(ListingModel),
     growthStats(BookingModel),
     growthStats(CustomerModel),
   ]);
 
-  sendSuccess(res, 200, {
+  return {
     listingsCount: listings.total,
     listingsGrowthPercent: listings.growthPercent,
     bookingsCount: bookings.total,
@@ -85,7 +90,12 @@ export const getAdminDashboard = asyncHandler(async (_req: Request, res: Respons
         dateTime: b.dateTime,
       };
     }),
-  });
+  };
+}
+
+export const getAdminDashboard = asyncHandler(async (_req: Request, res: Response) => {
+  const payload = await cached(ADMIN_DASHBOARD_CACHE_KEY, ADMIN_DASHBOARD_CACHE_TTL_MS, computeAdminDashboard);
+  sendSuccess(res, 200, payload);
 });
 
 export const getSystemHealth = asyncHandler(async (_req: Request, res: Response) => {

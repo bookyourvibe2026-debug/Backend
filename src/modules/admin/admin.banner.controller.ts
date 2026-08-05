@@ -6,7 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { invalidateBannerCache } from "../banners/banner.controller";
 
 export const listAdBanners = asyncHandler(async (_req: Request, res: Response) => {
-  const banners = await AdBannerModel.find().sort({ order: 1, createdAt: -1 });
+  const banners = await AdBannerModel.find().sort({ order: 1, createdAt: -1 }).lean();
   sendSuccess(res, 200, banners);
 });
 

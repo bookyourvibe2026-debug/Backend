@@ -29,7 +29,9 @@ export const listFoodVendors = asyncHandler(async (_req: Request, res: Response)
   const vendors = await VendorModel.find({
     verticals: "food",
     status: "approved",
-  }).select("businessName ownerName logo banner poster city state categories");
+  })
+    .select("businessName ownerName logo banner poster city state categories")
+    .lean();
   sendSuccess(res, 200, vendors);
 });
 
@@ -38,10 +40,12 @@ export const getFoodVendorMenu = asyncHandler(async (req: Request, res: Response
     _id: req.params.vendorId,
     verticals: "food",
     status: "approved",
-  }).select("businessName ownerName logo banner poster city state");
+  })
+    .select("businessName ownerName logo banner poster city state")
+    .lean();
   if (!vendor) throw ApiError.notFound("Food vendor not found");
 
-  const items = await MenuItemModel.find({ vendorId: vendor._id, inStock: true }).sort({ category: 1, name: 1 });
+  const items = await MenuItemModel.find({ vendorId: vendor._id, inStock: true }).sort({ category: 1, name: 1 }).lean();
   sendSuccess(res, 200, { vendor, items });
 });
 

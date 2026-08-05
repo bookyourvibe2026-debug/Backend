@@ -6,7 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { hashPassword } from "../../utils/password";
 
 export const listAdminSubUsers = asyncHandler(async (_req: Request, res: Response) => {
-  const subUsers = await AdminSubUserModel.find().sort({ createdAt: -1 });
+  const subUsers = await AdminSubUserModel.find().sort({ createdAt: -1 }).lean();
   sendSuccess(res, 200, subUsers);
 });
 
