@@ -22,7 +22,6 @@ const ISSUER = "byv-backend";
 
 export function signAccessToken(payload: AccessTokenPayload): string {
   return jwt.sign(payload, env.ACCESS_TOKEN_SECRET, {
-    expiresIn: env.ACCESS_TOKEN_TTL,
     issuer: ISSUER,
     audience: payload.audience,
   } as SignOptions);
