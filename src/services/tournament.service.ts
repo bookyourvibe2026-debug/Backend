@@ -66,7 +66,7 @@ async function paginateTournaments(
 ) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    TournamentModel.find(filter).sort({ startDate: 1 }).skip(skip).limit(limit),
+    TournamentModel.find(filter).sort({ startDate: 1 }).skip(skip).limit(limit).lean(),
     TournamentModel.countDocuments(filter),
   ]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
@@ -242,7 +242,7 @@ async function paginateRegistrations(
 ) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    TournamentRegistrationModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    TournamentRegistrationModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     TournamentRegistrationModel.countDocuments(filter),
   ]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };

@@ -17,7 +17,7 @@ export async function listFoodOrdersForCustomer(customerId: string, filters: { p
 
 async function paginate(filter: FilterQuery<FoodOrderDocument>, { page, limit }: { page: number; limit: number }) {
   const skip = (page - 1) * limit;
-  const query = FoodOrderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit);
+  const query = FoodOrderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
   const [items, total] = await Promise.all([query, FoodOrderModel.countDocuments(filter)]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
 }

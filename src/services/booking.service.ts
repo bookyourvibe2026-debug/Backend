@@ -65,16 +65,7 @@ export interface BookedRange {
   courtId?: string;
 }
 
-/** Non-cancelled bookings for one listing on one IST calendar date, as HH:mm ranges. */
-export async function getBookedRangesForDate(listingId: string, date: string): Promise<BookedRange[]> {
-  const dayStart = new Date(`${date}T00:00:00+05:30`);
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
-  const bookings = await BookingModel.find({
-    listingId,
-    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
-    dateTime: { $gte: dayStart, $lt: dayEnd },
-  }).select("dateTime endTime status courtId courtIds");
-
+function toBookedRanges(bookings: { dateTime: Date; endTime?: string; status: string; courtId?: string; courtIds?: string[] }[]): BookedRange[] {
   // A booking spanning several courts takes each of them out separately, so it is
   // flattened into one range per court — callers then need no multi-court awareness.
   return bookings.flatMap((b) => {
@@ -88,6 +79,51 @@ export async function getBookedRangesForDate(listingId: string, date: string): P
     if (courtIds.length === 0) return [base];
     return courtIds.map((courtId) => ({ ...base, courtId }));
   });
+}
+
+/** Non-cancelled bookings for one listing on one IST calendar date, as HH:mm ranges. */
+export async function getBookedRangesForDate(listingId: string, date: string): Promise<BookedRange[]> {
+  const dayStart = new Date(`${date}T00:00:00+05:30`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+  const bookings = await BookingModel.find({
+    listingId,
+    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
+    dateTime: { $gte: dayStart, $lt: dayEnd },
+  })
+    .select("dateTime endTime status courtId courtIds")
+    .lean();
+
+  return toBookedRanges(bookings);
+}
+
+/** Same as getBookedRangesForDate, but for many listings on one date in a single query —
+ * used by callers that would otherwise run one query per listing in a loop (e.g. the
+ * last-minute deals feed, which is polled every ~8-10s per client). */
+export async function getBookedRangesForDates(listingIds: string[], date: string): Promise<Map<string, BookedRange[]>> {
+  const result = new Map<string, BookedRange[]>();
+  if (listingIds.length === 0) return result;
+
+  const dayStart = new Date(`${date}T00:00:00+05:30`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+  const bookings = await BookingModel.find({
+    listingId: { $in: listingIds },
+    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
+    dateTime: { $gte: dayStart, $lt: dayEnd },
+  })
+    .select("listingId dateTime endTime status courtId courtIds")
+    .lean();
+
+  const byListing = new Map<string, typeof bookings>();
+  for (const b of bookings) {
+    const key = String(b.listingId);
+    const bucket = byListing.get(key) ?? [];
+    bucket.push(b);
+    byListing.set(key, bucket);
+  }
+  for (const [listingId, bucket] of byListing) {
+    result.set(listingId, toBookedRanges(bucket));
+  }
+  return result;
 }
 
 /** Courts a listing can sell right now, optionally narrowed to the courts hosting one sport. */
@@ -529,7 +565,7 @@ async function paginate(
   options: { populateListing?: boolean } = {}
 ) {
   const skip = (page - 1) * limit;
-  let query = BookingModel.find(filter).sort({ dateTime: -1 }).skip(skip).limit(limit);
+  let query = BookingModel.find(filter).sort({ dateTime: -1 }).skip(skip).limit(limit).lean();
   if (options.populateListing) query = query.populate("listingId", "title");
   const [items, total] = await Promise.all([query, BookingModel.countDocuments(filter)]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };

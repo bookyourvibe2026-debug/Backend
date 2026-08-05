@@ -128,4 +128,7 @@ const hostedMatchSchema = new Schema<HostedMatchDocument>(
   { timestamps: true }
 );
 
+// Open-matches feed filters by status and sorts/ranges by dateTime.
+hostedMatchSchema.index({ status: 1, dateTime: 1 });
+
 export const HostedMatchModel = model<HostedMatchDocument>("HostedMatch", hostedMatchSchema);

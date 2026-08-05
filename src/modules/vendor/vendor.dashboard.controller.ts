@@ -202,7 +202,8 @@ export const getVendorSettledPayments = asyncHandler(async (req: Request, res: R
   const bookings = await BookingModel.find({ vendorId: req.vendorId, paymentStatus: "paid" })
     .populate("listingId", "title")
     .sort({ updatedAt: -1 })
-    .limit(200);
+    .limit(200)
+    .lean();
 
   const settled = bookings.map((b) => ({
     date: b.updatedAt,

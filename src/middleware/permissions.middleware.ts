@@ -15,7 +15,7 @@ export function requireVendorPermission(moduleKey: ModulePermissionKey, action: 
       return;
     }
 
-    const staff = await VendorStaffModel.findById(req.auth.sub);
+    const staff = await VendorStaffModel.findById(req.auth.sub).select("status permissions").lean();
     if (!staff || staff.status === "Inactive") {
       throw ApiError.forbidden("Access revoked");
     }
@@ -35,7 +35,7 @@ export function requireAdminPermission(moduleKey: AdminModuleKey, action: Action
       return;
     }
 
-    const subUser = await AdminSubUserModel.findById(req.auth.sub);
+    const subUser = await AdminSubUserModel.findById(req.auth.sub).select("status permissions").lean();
     if (!subUser || subUser.status === "Inactive") {
       throw ApiError.forbidden("Access revoked");
     }

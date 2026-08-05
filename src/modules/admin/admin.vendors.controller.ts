@@ -11,7 +11,7 @@ export const listVendors = asyncHandler(async (req: Request, res: Response) => {
   const skip = (page - 1) * limit;
 
   const [items, total] = await Promise.all([
-    VendorModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    VendorModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     VendorModel.countDocuments(filter),
   ]);
 
@@ -19,7 +19,7 @@ export const listVendors = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getVendorById = asyncHandler(async (req: Request, res: Response) => {
-  const vendor = await VendorModel.findById(req.params.id!);
+  const vendor = await VendorModel.findById(req.params.id!).lean();
   if (!vendor) throw ApiError.notFound("Vendor not found");
   sendSuccess(res, 200, vendor);
 });

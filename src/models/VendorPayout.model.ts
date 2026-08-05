@@ -31,4 +31,7 @@ const vendorPayoutSchema = new Schema<VendorPayoutDocument>(
   { timestamps: true }
 );
 
+// Admin payouts list filters by status, sorted by newest first.
+vendorPayoutSchema.index({ status: 1, createdAt: -1 });
+
 export const VendorPayoutModel = model<VendorPayoutDocument>("VendorPayout", vendorPayoutSchema);

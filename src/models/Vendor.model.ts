@@ -96,4 +96,7 @@ const vendorSchema = new Schema<VendorDocument>(
   { timestamps: true }
 );
 
+// Admin vendor list filters by status, sorted by newest first.
+vendorSchema.index({ status: 1, createdAt: -1 });
+
 export const VendorModel = model<VendorDocument>("Vendor", vendorSchema);

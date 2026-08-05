@@ -37,7 +37,7 @@ export const listVendorPayouts = asyncHandler(async (req: Request, res: Response
 
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    VendorPayoutModel.find(filter).populate("vendorId", "businessName ownerName").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    VendorPayoutModel.find(filter).populate("vendorId", "businessName ownerName").sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     VendorPayoutModel.countDocuments(filter),
   ]);
 
@@ -64,21 +64,20 @@ export const updateVendorPayoutStatus = asyncHandler(async (req: Request, res: R
 });
 
 export const getVendorPayoutBookings = asyncHandler(async (req: Request, res: Response) => {
-  const payout = await VendorPayoutModel.findById(req.params.id!);
+  const payout = await VendorPayoutModel.findById(req.params.id!).lean();
   if (!payout) throw ApiError.notFound("Payout entry not found");
 
-  const bookings = await BookingModel.find({ _id: { $in: payout.bookingIds } }).populate("listingId", "title");
+  const bookings = await BookingModel.find({ _id: { $in: payout.bookingIds } }).populate("listingId", "title").lean();
   sendSuccess(
     res,
     200,
     bookings.map((b) => {
-      const obj = b.toObject();
-      const listing = obj.listingId as unknown as { title?: string } | null;
+      const listing = b.listingId as unknown as { title?: string } | null;
       return {
-        orderId: obj.orderId,
-        customerName: obj.customerName,
+        orderId: b.orderId,
+        customerName: b.customerName,
         listingTitle: listing?.title ?? "Deleted listing",
-        vendorEarning: obj.vendorEarning,
+        vendorEarning: b.vendorEarning,
       };
     })
   );

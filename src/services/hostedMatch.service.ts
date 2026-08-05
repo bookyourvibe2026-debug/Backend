@@ -240,13 +240,16 @@ export async function listOpenHostedMatches(filters: { sport?: string; date?: st
   const matches = await HostedMatchModel.find(query)
     .populate("listingId", "title coverImage address city type price")
     .sort({ dateTime: 1 })
-    .limit(filters.limit || 30);
+    .limit(filters.limit || 30)
+    .lean();
 
   return matches;
 }
 
-export async function getHostedMatchById(matchId: string): Promise<HostedMatchDocument> {
-  const match = await HostedMatchModel.findOne({ matchId }).populate("listingId", "title coverImage address city type price");
+export async function getHostedMatchById(matchId: string) {
+  const match = await HostedMatchModel.findOne({ matchId })
+    .populate("listingId", "title coverImage address city type price")
+    .lean();
   if (!match) throw ApiError.notFound("Match not found");
   return match;
 }

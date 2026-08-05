@@ -190,12 +190,16 @@ export async function findPublicVendorProfile(vendorId: string) {
       .lean();
     if (!vendor) throw ApiError.notFound("Vendor not found");
 
+    // Public storefront card grid only — same field set as findVenueRankings below.
     const listings = await ListingModel.find({
       vendorId,
       status: "Active",
       isPrivate: false,
       type: { $in: ["Turf", "Game"] },
-    }).sort({ trending: -1, createdAt: -1 }).lean();
+    })
+      .select("title slug city address coverImage images price categories tags trending")
+      .sort({ trending: -1, createdAt: -1 })
+      .lean();
 
     return { vendor, listings };
   });
@@ -217,7 +221,10 @@ export async function listVendorListings(vendorId: string, query: Partial<Listin
   const filter: FilterQuery<ListingDocument> = { vendorId };
   if (query.type) filter.type = query.type;
   if (query.search) filter.$text = { $search: query.search };
-  return ListingModel.find(filter).sort({ createdAt: -1 });
+  // No field projection here — several vendor-panel consumers (boost/pricing sheets,
+  // clone) read the full document, not just table-summary fields. .lean() alone still
+  // avoids Mongoose document hydration cost without changing what's available.
+  return ListingModel.find(filter).sort({ createdAt: -1 }).lean();
 }
 
 export async function listAdminListings(query: Partial<ListingQuery>) {
@@ -225,7 +232,9 @@ export async function listAdminListings(query: Partial<ListingQuery>) {
   if (query.city) filter.city = query.city;
   if (query.type) filter.type = query.type;
   if (query.search) filter.$text = { $search: query.search };
-  return ListingModel.find(filter).sort({ createdAt: -1 });
+  // Same reasoning as listVendorListings — the admin table's "Clone" action reads the
+  // full listing object, so no projection here either.
+  return ListingModel.find(filter).sort({ createdAt: -1 }).lean();
 }
 
 export async function getListingScopedToVendor(id: string, vendorId: string) {

@@ -99,7 +99,7 @@ async function paginateCoaches(
 ) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    CoachModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    CoachModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     CoachModel.countDocuments(filter),
   ]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };
@@ -358,7 +358,7 @@ async function paginateSubscriptions(
 ) {
   const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
-    CoachSubscriptionModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    CoachSubscriptionModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     CoachSubscriptionModel.countDocuments(filter),
   ]);
   return { items, total, page, limit, pages: Math.ceil(total / limit) };

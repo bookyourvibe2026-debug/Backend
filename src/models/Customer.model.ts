@@ -38,4 +38,7 @@ const customerSchema = new Schema<CustomerDocument>(
   { timestamps: true }
 );
 
+// Admin customer list filters by status, sorted by newest first.
+customerSchema.index({ status: 1, createdAt: -1 });
+
 export const CustomerModel = model<CustomerDocument>("Customer", customerSchema);

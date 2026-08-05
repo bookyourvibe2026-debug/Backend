@@ -41,11 +41,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
   });
 }
 
-export async function listNotificationsForUser(
-  customerId?: string,
-  phone?: string,
-  limit = 30
-): Promise<NotificationDocument[]> {
+export async function listNotificationsForUser(customerId?: string, phone?: string, limit = 30) {
   const conditions: any[] = [];
   if (customerId) conditions.push({ recipientCustomerId: customerId });
   if (phone) conditions.push({ recipientPhone: phone });
@@ -54,7 +50,8 @@ export async function listNotificationsForUser(
 
   return NotificationModel.find({ $or: conditions })
     .sort({ createdAt: -1 })
-    .limit(limit);
+    .limit(limit)
+    .lean();
 }
 
 export async function markNotificationAsRead(

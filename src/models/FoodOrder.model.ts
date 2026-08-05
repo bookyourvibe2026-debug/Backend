@@ -64,5 +64,7 @@ const foodOrderSchema = new Schema<FoodOrderDocument>(
 );
 
 foodOrderSchema.index({ vendorId: 1, createdAt: -1 });
+// Customer order-history list filters by customerId, sorted by newest first.
+foodOrderSchema.index({ customerId: 1, createdAt: -1 });
 
 export const FoodOrderModel = model<FoodOrderDocument>("FoodOrder", foodOrderSchema);

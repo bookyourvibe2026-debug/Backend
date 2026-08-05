@@ -111,5 +111,11 @@ const bookingSchema = new Schema<BookingDocument>(
 bookingSchema.index({ vendorId: 1, dateTime: -1 });
 bookingSchema.index({ listingId: 1, dateTime: 1, status: 1 });
 bookingSchema.index({ customerId: 1, status: 1, createdAt: -1 });
+// Vendor dashboards/exports filter+sort by booking-creation date rather than slot date.
+bookingSchema.index({ vendorId: 1, createdAt: -1 });
+// Event check-in/arrivals lists filter by checkedIn and sort by check-in time.
+bookingSchema.index({ vendorId: 1, checkedIn: 1, checkedInAt: -1 });
+// Settled-payments views filter by paymentStatus, sorted by last update.
+bookingSchema.index({ paymentStatus: 1, updatedAt: -1 });
 
 export const BookingModel = model<BookingDocument>("Booking", bookingSchema);

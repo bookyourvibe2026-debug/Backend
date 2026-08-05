@@ -9,11 +9,10 @@ export const getAdminBookings = asyncHandler(async (req: Request, res: Response)
   sendSuccess(res, 200, {
     ...result,
     items: result.items.map((booking) => {
-      const obj = booking.toObject();
-      const listing = obj.listingId as unknown as { _id: unknown; title?: string } | null;
+      const listing = booking.listingId as unknown as { _id: unknown; title?: string } | null;
       return {
-        ...obj,
-        listingId: listing?._id ?? obj.listingId,
+        ...booking,
+        listingId: listing?._id ?? booking.listingId,
         listingTitle: listing?.title ?? "Deleted listing",
       };
     }),

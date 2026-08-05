@@ -1,5 +1,5 @@
 import { Court, ListingModel } from "../../models/Listing.model";
-import { IST, getBookedRangesForDate, istTimeHHmm, rangesOverlap, timeToMinutes, bookableCourts } from "../../services/booking.service";
+import { IST, getBookedRangesForDates, istTimeHHmm, rangesOverlap, timeToMinutes, bookableCourts, type BookedRange } from "../../services/booking.service";
 import { boostedPrice, clampBoostPct, isWindowOpen } from "../../services/lastMinBoost.service";
 
 export interface LastMinuteDealDto {
@@ -26,7 +26,7 @@ export interface LastMinuteDealDto {
 
 /** Which of a listing's courts are still free for one slot window, given its booked ranges. */
 function isCourtFree(
-  ranges: Awaited<ReturnType<typeof getBookedRangesForDate>>,
+  ranges: BookedRange[],
   slotStart: number,
   slotEnd: number,
   courtId: string | undefined,
@@ -64,6 +64,13 @@ export async function getActiveLastMinuteDeals(): Promise<LastMinuteDealDto[]> {
 
   const deals: LastMinuteDealDto[] = [];
 
+  // One batched query for every boosted listing's booked ranges today, instead of one
+  // query per listing inside the loop — this endpoint is polled every ~8-10s per client.
+  const rangesByListing = await getBookedRangesForDates(
+    listings.map((l) => String(l._id)),
+    dateStr
+  );
+
   for (const listing of listings) {
     const override = listing.dateOverrides?.find((o) => o.date === dateStr);
     if (override?.isHoliday) continue;
@@ -71,7 +78,7 @@ export async function getActiveLastMinuteDeals(): Promise<LastMinuteDealDto[]> {
     if (!slots?.length) continue;
 
     const courts = listing.courts ?? [];
-    const bookedRanges = await getBookedRangesForDate(String(listing._id), dateStr);
+    const bookedRanges = rangesByListing.get(String(listing._id)) ?? [];
 
     for (const rule of listing.lastMinBoosts ?? []) {
       if (!rule.enabled) continue;
