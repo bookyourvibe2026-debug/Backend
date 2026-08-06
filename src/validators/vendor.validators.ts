@@ -140,6 +140,10 @@ export const createMenuItemSchema = z.object({
   inStock: z.boolean().optional(),
   prepTimeMins: z.coerce.number().int().min(0).optional(),
   priceVariants: z.array(priceVariantSchema).max(10).optional(),
+  trackInventory: z.boolean().optional(),
+  stockQty: z.coerce.number().int().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  stockUnit: z.string().trim().max(20).optional(),
 });
 
 export const updateMenuItemSchema = z.object({
@@ -152,6 +156,10 @@ export const updateMenuItemSchema = z.object({
   inStock: z.boolean().optional(),
   prepTimeMins: z.coerce.number().int().min(0).optional(),
   priceVariants: z.array(priceVariantSchema).max(10).optional(),
+  trackInventory: z.boolean().optional(),
+  stockQty: z.coerce.number().int().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  stockUnit: z.string().trim().max(20).optional(),
 });
 
 export const menuListQuerySchema = z.object({
@@ -160,6 +168,15 @@ export const menuListQuerySchema = z.object({
 
 export const menuItemIdParamSchema = z.object({
   id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid id"),
+});
+
+/** Quick stock edit from the inventory board — no need to resend the whole dish. */
+export const updateMenuStockSchema = z.object({
+  trackInventory: z.boolean().optional(),
+  stockQty: z.coerce.number().int().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  stockUnit: z.string().trim().max(20).optional(),
+  inStock: z.boolean().optional(),
 });
 
 export const createSubscriptionSchema = z.object({

@@ -7,6 +7,7 @@ import {
   menuItemIdParamSchema,
   menuListQuerySchema,
   updateMenuItemSchema,
+  updateMenuStockSchema,
 } from "../../validators/vendor.validators";
 import {
   bulkUploadMenuItems,
@@ -15,6 +16,7 @@ import {
   listMenuItems,
   menuSheetUploadMiddleware,
   updateMenuItem,
+  updateMenuItemStock,
 } from "./vendor.menu.controller";
 
 const router = Router();
@@ -34,6 +36,12 @@ router.put(
   requireVendorPermission("menu", "edit"),
   validate({ params: menuItemIdParamSchema, body: updateMenuItemSchema }),
   updateMenuItem
+);
+router.patch(
+  "/:id/stock",
+  requireVendorPermission("menu", "edit"),
+  validate({ params: menuItemIdParamSchema, body: updateMenuStockSchema }),
+  updateMenuItemStock
 );
 router.delete("/:id", requireVendorPermission("menu", "delete"), validate({ params: menuItemIdParamSchema }), deleteMenuItem);
 

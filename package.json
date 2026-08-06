@@ -17,6 +17,7 @@
     "seed": "tsx src/seed/seed.ts",
     "seed:listing": "tsx src/seed/seedSampleListing.ts",
     "seed:foodMenu": "tsx src/seed/seedFoodMenu.ts",
+    "seed:dineout": "tsx src/seed/seedDineoutPartners.ts",
     "seed:refresh": "tsx src/seed/refreshData.ts"
   },
   "dependencies": {

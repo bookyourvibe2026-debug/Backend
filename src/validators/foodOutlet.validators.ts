@@ -56,6 +56,28 @@ export const outletLeaveSchema = z.object({
   reason: z.string().max(200).optional(),
 });
 
+/** Per-category prep-time defaults + which fulfilment modes the outlet accepts. */
+export const outletPrepTimesSchema = z.object({
+  categoryPrepTimes: z
+    .array(
+      z.object({
+        category: z.string().trim().min(1).max(60),
+        prepTimeMins: z.coerce.number().int().min(0).max(240),
+      })
+    )
+    .max(40)
+    .optional(),
+  serviceBufferMins: z.coerce.number().int().min(0).max(60).optional(),
+  fulfilment: z
+    .object({
+      preOrder: z.boolean().optional(),
+      inVenue: z.boolean().optional(),
+      postMatch: z.boolean().optional(),
+      dineIn: z.boolean().optional(),
+    })
+    .optional(),
+});
+
 export const outletLeaveDateParamSchema = z.object({
   id: objectId,
   date: z.string().min(1),

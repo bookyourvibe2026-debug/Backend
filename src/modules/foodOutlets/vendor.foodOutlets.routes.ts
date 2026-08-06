@@ -7,6 +7,7 @@ import {
   outletIdParamSchema,
   outletLeaveDateParamSchema,
   outletLeaveSchema,
+  outletPrepTimesSchema,
   outletWeeklyAvailabilitySchema,
   updateOutletSchema,
 } from "../../validators/foodOutlet.validators";
@@ -18,6 +19,7 @@ import {
   getVendorOutlets,
   removeVendorOutletLeave,
   setVendorOutletAvailability,
+  setVendorOutletPrepTimes,
   updateVendorOutlet,
 } from "./vendor.foodOutlets.controller";
 
@@ -47,6 +49,13 @@ router.put(
   requireVendorPermission("menu", "edit"),
   validate({ params: outletIdParamSchema, body: outletWeeklyAvailabilitySchema }),
   setVendorOutletAvailability
+);
+
+router.put(
+  "/:id/prep-times",
+  requireVendorPermission("menu", "edit"),
+  validate({ params: outletIdParamSchema, body: outletPrepTimesSchema }),
+  setVendorOutletPrepTimes
 );
 
 router.post(

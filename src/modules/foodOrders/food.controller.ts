@@ -5,7 +5,12 @@ import { MenuItemModel } from "../../models/MenuItem.model";
 import { ApiError } from "../../utils/ApiError";
 import { sendSuccess } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { createFoodOrder, getFoodOrderByOrderId, listFoodOrdersForCustomer } from "../../services/foodOrder.service";
+import {
+  createFoodOrder,
+  getFoodOrderByOrderId,
+  listFoodOrdersForCustomer,
+  quoteFoodOrder,
+} from "../../services/foodOrder.service";
 import { getPublicOutletWithMenu, listPublicOutlets } from "../../services/foodOutlet.service";
 
 export const listOutlets = asyncHandler(async (req: Request, res: Response) => {
@@ -49,6 +54,17 @@ export const getFoodVendorMenu = asyncHandler(async (req: Request, res: Response
   sendSuccess(res, 200, { vendor, items });
 });
 
+/** Price + GST + ETA preview the player sees before paying. Public — no login needed to see a quote. */
+export const getFoodOrderQuote = asyncHandler(async (req: Request, res: Response) => {
+  const quote = await quoteFoodOrder({
+    outletId: req.body.outletId,
+    vendorId: req.body.vendorId,
+    items: req.body.items,
+    orderType: req.body.orderType,
+  });
+  sendSuccess(res, 200, quote);
+});
+
 export const placeFoodOrder = asyncHandler(async (req: Request, res: Response) => {
   const customer = await CustomerModel.findById(req.auth!.sub);
   if (!customer) throw ApiError.notFound("Customer not found");
@@ -60,6 +76,10 @@ export const placeFoodOrder = asyncHandler(async (req: Request, res: Response) =
     outletId: req.body.outletId,
     vendorId: req.body.vendorId,
     items: req.body.items,
+    orderType: req.body.orderType,
+    scheduledFor: req.body.scheduledFor,
+    serveTo: req.body.serveTo,
+    paymentMethod: req.body.paymentMethod,
     notes: req.body.notes,
   });
   sendSuccess(res, 201, order, "Order placed");

@@ -18,9 +18,18 @@ export interface MenuItemDocument {
   category: string;
   photo?: string;
   inStock: boolean;
+  /** Overrides the outlet's per-category default when set. */
   prepTimeMins?: number;
   /** When non-empty, the customer must pick one of these when ordering. */
   priceVariants: PriceVariant[];
+  /** Opt-in stock counting. Off by default so existing dishes keep the simple in/out toggle. */
+  trackInventory: boolean;
+  /** Units on hand; decremented as orders come in, restored when an order is rejected/cancelled. */
+  stockQty: number;
+  /** At or below this count the item shows as "Low stock" on the inventory board. */
+  lowStockThreshold: number;
+  /** Display unit for the count — plates, pcs, bottles… */
+  stockUnit?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +54,10 @@ const menuItemSchema = new Schema<MenuItemDocument>(
     inStock: { type: Boolean, default: true },
     prepTimeMins: { type: Number, min: 0 },
     priceVariants: { type: [priceVariantSchema], default: [] },
+    trackInventory: { type: Boolean, default: false },
+    stockQty: { type: Number, default: 0, min: 0 },
+    lowStockThreshold: { type: Number, default: 5, min: 0 },
+    stockUnit: { type: String, trim: true, maxlength: 20 },
   },
   { timestamps: true }
 );

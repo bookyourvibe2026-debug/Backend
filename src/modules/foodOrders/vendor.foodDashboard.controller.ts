@@ -23,7 +23,7 @@ export const getVendorFoodDashboard = asyncHandler(async (req: Request, res: Res
   trendSince.setDate(trendSince.getDate() - 13);
   trendSince.setHours(0, 0, 0, 0);
 
-  const [statusCounts, revenue, allTimeOrders, trend, recent] = await Promise.all([
+  const [statusCounts, revenue, allTimeOrders, trend, recent, byChannel, byType] = await Promise.all([
     FoodOrderModel.aggregate([
       { $match: { vendorId: vendorObjectId, createdAt: { $gte: since } } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -46,8 +46,17 @@ export const getVendorFoodDashboard = asyncHandler(async (req: Request, res: Res
     FoodOrderModel.find({ vendorId })
       .sort({ createdAt: -1 })
       .limit(8)
-      .select("orderId customerName items totalAmount status createdAt")
+      .select("orderId customerName items totalAmount status orderType channel outletId createdAt")
       .lean(),
+    // Counter (POS) vs app revenue — the Billing Slide's takings feed the same dashboard.
+    FoodOrderModel.aggregate([
+      { $match: { vendorId: vendorObjectId, status: "Delivered", createdAt: { $gte: since } } },
+      { $group: { _id: { $ifNull: ["$channel", "app"] }, revenue: { $sum: "$totalAmount" }, orders: { $sum: 1 } } },
+    ]),
+    FoodOrderModel.aggregate([
+      { $match: { vendorId: vendorObjectId, createdAt: { $gte: since } } },
+      { $group: { _id: { $ifNull: ["$orderType", "PostMatch"] }, count: { $sum: 1 } } },
+    ]),
   ]);
 
   // Fill the 14-day series so the chart always has a full window.
@@ -72,6 +81,10 @@ export const getVendorFoodDashboard = asyncHandler(async (req: Request, res: Res
     totalRevenue: revenue[0]?.totalRevenue ?? 0,
     deliveredOrderCount: revenue[0]?.orderCount ?? 0,
     allTimeOrderCount: allTimeOrders,
+    counterRevenue: byChannel.find((c: { _id: string }) => c._id === "pos")?.revenue ?? 0,
+    counterOrderCount: byChannel.find((c: { _id: string }) => c._id === "pos")?.orders ?? 0,
+    appRevenue: byChannel.find((c: { _id: string }) => c._id === "app")?.revenue ?? 0,
+    ordersByType: Object.fromEntries(byType.map((t: { _id: string; count: number }) => [t._id, t.count])),
     chart,
     recentOrders: recent,
   });

@@ -29,6 +29,17 @@ export const updateMenuItem = asyncHandler(async (req: Request, res: Response) =
   sendSuccess(res, 200, item, "Menu item updated");
 });
 
+/** Inventory board edit — adjust stock levels without touching the rest of the dish. */
+export const updateMenuItemStock = asyncHandler(async (req: Request, res: Response) => {
+  const item = await MenuItemModel.findOne({ _id: req.params.id, vendorId: req.vendorId });
+  if (!item) throw ApiError.notFound("Menu item not found");
+  item.set(req.body);
+  // Restocking a sold-out dish puts it back on the menu; hitting zero takes it off.
+  if (item.trackInventory && req.body.inStock === undefined) item.inStock = item.stockQty > 0;
+  await item.save();
+  sendSuccess(res, 200, item, "Stock updated");
+});
+
 export const deleteMenuItem = asyncHandler(async (req: Request, res: Response) => {
   const item = await MenuItemModel.findOneAndDelete({ _id: req.params.id, vendorId: req.vendorId });
   if (!item) throw ApiError.notFound("Menu item not found");

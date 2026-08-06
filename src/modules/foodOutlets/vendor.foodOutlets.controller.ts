@@ -8,6 +8,7 @@ import {
   getOutletForVendor,
   listOutletsForVendor,
   removeOutletLeave,
+  setOutletPrepTimes,
   setOutletWeeklyAvailability,
   updateOutlet,
 } from "../../services/foodOutlet.service";
@@ -40,6 +41,12 @@ export const deleteVendorOutlet = asyncHandler(async (req: Request, res: Respons
 export const setVendorOutletAvailability = asyncHandler(async (req: Request, res: Response) => {
   const outlet = await setOutletWeeklyAvailability(req.vendorId!, req.params.id!, req.body.days);
   sendSuccess(res, 200, outlet, "Opening hours updated");
+});
+
+/** Per-category prep times drive the ETA the player sees at checkout. */
+export const setVendorOutletPrepTimes = asyncHandler(async (req: Request, res: Response) => {
+  const outlet = await setOutletPrepTimes(req.vendorId!, req.params.id!, req.body);
+  sendSuccess(res, 200, outlet, "Prep times updated");
 });
 
 export const addVendorOutletLeave = asyncHandler(async (req: Request, res: Response) => {

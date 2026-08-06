@@ -1,5 +1,11 @@
 import { FilterQuery, Types } from "mongoose";
-import { FoodOutletModel, FoodOutletDocument, OutletWeeklyDay } from "../models/FoodOutlet.model";
+import {
+  CategoryPrepTime,
+  FoodOutletModel,
+  FoodOutletDocument,
+  OutletDineout,
+  OutletWeeklyDay,
+} from "../models/FoodOutlet.model";
 import { MenuItemModel } from "../models/MenuItem.model";
 import { ApiError } from "../utils/ApiError";
 
@@ -64,6 +70,36 @@ export async function setOutletWeeklyAvailability(vendorId: string, outletId: st
   return outlet;
 }
 
+/** Save the owner's per-category prep-time defaults, service buffer and accepted fulfilment modes. */
+export async function setOutletPrepTimes(
+  vendorId: string,
+  outletId: string,
+  input: {
+    categoryPrepTimes?: CategoryPrepTime[];
+    serviceBufferMins?: number;
+    fulfilment?: { preOrder?: boolean; inVenue?: boolean; postMatch?: boolean; dineIn?: boolean };
+  }
+) {
+  const outlet = await getOutletForVendor(vendorId, outletId);
+  if (input.categoryPrepTimes) outlet.categoryPrepTimes = input.categoryPrepTimes;
+  if (input.serviceBufferMins !== undefined) outlet.serviceBufferMins = input.serviceBufferMins;
+  if (input.fulfilment) outlet.fulfilment = { ...outlet.fulfilment, ...input.fulfilment };
+  await outlet.save();
+  return outlet;
+}
+
+/** Table-booking and pay-bill settings for a dining outlet. */
+export async function setOutletDineout(
+  vendorId: string,
+  outletId: string,
+  input: Partial<OutletDineout>
+) {
+  const outlet = await getOutletForVendor(vendorId, outletId);
+  outlet.dineout = { ...outlet.dineout, ...input } as OutletDineout;
+  await outlet.save();
+  return outlet;
+}
+
 function sameDay(a: Date, b: Date) {
   return (
     a.getUTCFullYear() === b.getUTCFullYear() &&
@@ -94,6 +130,30 @@ export async function removeOutletLeave(vendorId: string, outletId: string, isoD
 
 /* ------------------------------- Public browse ------------------------------- */
 
+/** Schema defaults for outlets saved before Dineout shipped. */
+const DINEOUT_DEFAULTS: OutletDineout = {
+  tableBooking: true,
+  payBill: true,
+  flatDiscountPct: 10,
+  slotMinutes: 60,
+  tablesPerSlot: 10,
+  maxPartySize: 20,
+  advanceDays: 30,
+  autoConfirm: false,
+};
+
+/**
+ * Fill in Dineout defaults on lean reads.
+ *
+ * Mongoose only applies schema defaults to hydrated documents, so a `.lean()` query on an
+ * outlet created before Dineout returns no `dineout` block at all. The booking and payment
+ * paths load hydrated documents and therefore *do* see the defaults — without this the
+ * restaurant page would advertise no discount while the bill quietly applied one.
+ */
+function withDineoutDefaults<T extends { dineout?: OutletDineout }>(outlet: T): T & { dineout: OutletDineout } {
+  return { ...outlet, dineout: { ...DINEOUT_DEFAULTS, ...(outlet.dineout ?? {}) } };
+}
+
 export interface PublicOutletFilters {
   cuisine?: string;
   city?: string;
@@ -109,10 +169,11 @@ export async function listPublicOutlets(filters: PublicOutletFilters) {
   if (filters.kind) match.kind = filters.kind;
 
   const skip = (filters.page - 1) * filters.limit;
-  const [items, total] = await Promise.all([
+  const [rows, total] = await Promise.all([
     FoodOutletModel.find(match).sort({ createdAt: -1 }).skip(skip).limit(filters.limit).lean(),
     FoodOutletModel.countDocuments(match),
   ]);
+  const items = rows.map(withDineoutDefaults);
   return { items, total, page: filters.page, limit: filters.limit, pages: Math.ceil(total / filters.limit) };
 }
 
@@ -129,7 +190,7 @@ export async function getPublicOutletWithMenu(idOrSlug: string) {
   todayStart.setHours(0, 0, 0, 0);
   const upcomingLeaves = (outlet.leaves ?? []).filter((l) => new Date(l.date) >= todayStart);
 
-  return { outlet: { ...outlet, leaves: upcomingLeaves }, menu };
+  return { outlet: withDineoutDefaults({ ...outlet, leaves: upcomingLeaves }), menu };
 }
 
 function escapeRegex(value: string) {

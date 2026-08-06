@@ -23,6 +23,39 @@ export interface OutletLocation {
   lng?: number;
 }
 
+/** Owner-set default prep time for a menu category — e.g. "Beverages" 5 min, "Main Course" 15 min.
+ *  This is what drives the ETA the player sees at checkout, before paying. */
+export interface CategoryPrepTime {
+  category: string;
+  prepTimeMins: number;
+}
+
+/**
+ * Dineout settings — table reservations and in-app bill payment.
+ *
+ * Only meaningful for `kind: "dining"` outlets (partner cafes and restaurants near a venue).
+ * Venue food counters use the ordering flow instead.
+ */
+export interface OutletDineout {
+  /** Accepts table reservations through the app. */
+  tableBooking: boolean;
+  /** Accepts in-app bill payment at the restaurant. */
+  payBill: boolean;
+  /** Flat % off the bill for players paying through BYV. Funded by the restaurant. */
+  flatDiscountPct: number;
+  /** Length of one reservation slot, in minutes. */
+  slotMinutes: number;
+  /** Tables bookable per slot — the cap on concurrent reservations. */
+  tablesPerSlot: number;
+  maxPartySize: number;
+  /** How many days ahead a player can reserve. */
+  advanceDays: number;
+  /** Typical spend for two, shown on the restaurant card. */
+  costForTwo?: number;
+  /** Reservations auto-confirm instead of waiting on the restaurant to accept. */
+  autoConfirm: boolean;
+}
+
 export interface FoodOutletDocument {
   _id: Types.ObjectId;
   vendorId: Types.ObjectId;
@@ -43,6 +76,19 @@ export interface FoodOutletDocument {
   location: OutletLocation;
   weeklyAvailability: OutletWeeklyDay[];
   leaves: OutletLeave[];
+  /** Per-category prep-time defaults; drives the player's checkout ETA. */
+  categoryPrepTimes: CategoryPrepTime[];
+  /** Table booking + pay-bill settings. Used by "dining" outlets. */
+  dineout: OutletDineout;
+  /** Minutes added on top of prep time when the order is delivered to a court/table. */
+  serviceBufferMins: number;
+  /** Which fulfilment modes this outlet accepts. Player sees only these at checkout. */
+  fulfilment: {
+    preOrder: boolean;
+    inVenue: boolean;
+    postMatch: boolean;
+    dineIn: boolean;
+  };
   status: "Active" | "Inactive";
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +109,29 @@ const leaveSchema = new Schema<OutletLeave>(
     date: { type: Date, required: true },
     type: { type: String, enum: ["full", "half"], default: "full" },
     reason: { type: String, maxlength: 200 },
+  },
+  { _id: false }
+);
+
+const categoryPrepTimeSchema = new Schema<CategoryPrepTime>(
+  {
+    category: { type: String, required: true, trim: true, maxlength: 60 },
+    prepTimeMins: { type: Number, required: true, min: 0, max: 240 },
+  },
+  { _id: false }
+);
+
+const dineoutSchema = new Schema<OutletDineout>(
+  {
+    tableBooking: { type: Boolean, default: true },
+    payBill: { type: Boolean, default: true },
+    flatDiscountPct: { type: Number, default: 10, min: 0, max: 100 },
+    slotMinutes: { type: Number, default: 60, min: 15, max: 240 },
+    tablesPerSlot: { type: Number, default: 10, min: 1, max: 500 },
+    maxPartySize: { type: Number, default: 20, min: 1, max: 100 },
+    advanceDays: { type: Number, default: 30, min: 1, max: 180 },
+    costForTwo: { type: Number, min: 0 },
+    autoConfirm: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -94,6 +163,15 @@ const foodOutletSchema = new Schema<FoodOutletDocument>(
     location: { type: locationSchema, default: {} },
     weeklyAvailability: { type: [weeklyDaySchema], default: () => defaultWeek() },
     leaves: { type: [leaveSchema], default: [] },
+    categoryPrepTimes: { type: [categoryPrepTimeSchema], default: [] },
+    dineout: { type: dineoutSchema, default: () => ({}) },
+    serviceBufferMins: { type: Number, default: 5, min: 0, max: 60 },
+    fulfilment: {
+      preOrder: { type: Boolean, default: true },
+      inVenue: { type: Boolean, default: true },
+      postMatch: { type: Boolean, default: true },
+      dineIn: { type: Boolean, default: true },
+    },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
   },
   { timestamps: true }

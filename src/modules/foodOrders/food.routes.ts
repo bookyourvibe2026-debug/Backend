@@ -2,9 +2,15 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate.middleware";
 import { orderIdParamSchema } from "../../validators/booking.validators";
-import { createFoodOrderSchema, foodVendorIdParamSchema, myFoodOrdersQuerySchema } from "../../validators/foodOrder.validators";
+import {
+  createFoodOrderSchema,
+  foodVendorIdParamSchema,
+  myFoodOrdersQuerySchema,
+  quoteFoodOrderSchema,
+} from "../../validators/foodOrder.validators";
 import { publicOutletParamSchema, publicOutletQuerySchema } from "../../validators/foodOutlet.validators";
 import {
+  getFoodOrderQuote,
   getFoodVendorMenu,
   getMyFoodOrderByOrderId,
   getMyFoodOrders,
@@ -23,6 +29,9 @@ router.get("/outlets/:id", validate({ params: publicOutletParamSchema }), getOut
 // Legacy vendor-account-based browse — kept for old links/clients.
 router.get("/vendors", listFoodVendors);
 router.get("/vendors/:vendorId/menu", validate({ params: foodVendorIdParamSchema }), getFoodVendorMenu);
+
+// Checkout preview — bill breakdown and prep-time ETA, before the player commits to paying.
+router.post("/orders/quote", validate({ body: quoteFoodOrderSchema }), getFoodOrderQuote);
 
 // Customer-only — placing and viewing orders.
 router.post("/orders", requireAuth("customer"), validate({ body: createFoodOrderSchema }), placeFoodOrder);

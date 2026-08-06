@@ -13,6 +13,7 @@ import challengesRoutes from "../modules/challenges/challenges.routes";
 import coachesRoutes from "../modules/coaches/coaches.routes";
 import customerCoachesRoutes from "../modules/coaches/customer.coaches.routes";
 import foodRoutes from "../modules/foodOrders/food.routes";
+import dineoutRoutes from "../modules/dineout/dineout.routes";
 import tournamentsRoutes from "../modules/tournaments/tournaments.routes";
 import customerTournamentsRoutes from "../modules/tournaments/customer.tournaments.routes";
 import vendorRoutes from "../modules/vendor/vendor.routes";
@@ -45,6 +46,7 @@ router.use("/coach-subscriptions", customerCoachesRoutes);
 router.use("/tournaments", tournamentsRoutes);
 router.use("/tournament-registrations", customerTournamentsRoutes);
 router.use("/food", foodRoutes);
+router.use("/dineout", dineoutRoutes);
 router.use("/analytics", analyticsRoutes);
 router.use("/leaderboard", leaderboardRoutes);
 
