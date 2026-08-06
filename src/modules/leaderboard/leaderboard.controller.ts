@@ -3,7 +3,7 @@ import { BookingModel } from "../../models/Booking.model";
 import { CustomerModel } from "../../models/Customer.model";
 import { ListingModel } from "../../models/Listing.model";
 import { cached } from "../../utils/cache";
-
+import { sendSuccess } from "../../utils/ApiResponse";
 
 const LEADERBOARD_CACHE_PREFIX = "leaderboard:top-players:";
 const LEADERBOARD_CACHE_TTL_MS = 30_000; // matches the public-listing cache TTL
@@ -27,7 +27,7 @@ export async function getTopPlayersLeaderboard(req: Request, res: Response): Pro
     const cacheKey = `${LEADERBOARD_CACHE_PREFIX}${JSON.stringify({ area, limit })}`;
     const payload = await cached(cacheKey, LEADERBOARD_CACHE_TTL_MS, () => computeLeaderboard(area, limit));
 
-    res.json({ success: true, ...payload });
+    sendSuccess(res, 200, payload);
   } catch (error: any) {
     console.error("[LeaderboardController] Error fetching player leaderboard:", error);
     res.status(500).json({ success: false, error: "Failed to load player leaderboard" });
