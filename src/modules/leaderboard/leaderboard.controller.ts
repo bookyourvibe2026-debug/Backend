@@ -45,10 +45,10 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
   }
   const areasList = Array.from(parsedAreas);
 
-  // Pipeline to aggregate completed/confirmed bookings per player
+  // Only count genuinely confirmed / completed & paid bookings
   const matchStage: any = {
-    status: { $nin: ["Cancelled"] },
-    paymentStatus: { $ne: "failed" },
+    status: { $in: ["Confirmed", "Completed"] },
+    paymentStatus: { $in: ["paid", "Cash (Offline)", "partial"] },
   };
 
   const pipeline: any[] = [
@@ -85,8 +85,11 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
         completedBookings: { $sum: 1 },
         lastCompletedBookingAt: { $max: "$createdAt" },
         listingAddresses: { $addToSet: "$listing.address" },
+        sportsPlayed: { $addToSet: "$sport" },
       },
     },
+    // Only include players who have at least 1 real booking
+    { $match: { completedBookings: { $gte: 1 } } },
     {
       $sort: {
         completedBookings: -1,
@@ -107,13 +110,14 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
 
   const bookingResults = await BookingModel.aggregate(pipeline);
 
-  let items = bookingResults.map((item, index) => {
+  const items = bookingResults.map((item, index) => {
     const c = item.customerDoc;
     const name = c?.name || item.customerName || "Anonymous Player";
     const username = c?.username ? (c.username.startsWith("@") ? c.username : `@${c.username}`) : undefined;
     const profileImage = c?.avatarUrl || null;
     const city = c?.city || "Udaipur";
     const areaName = c?.area || (item.listingAddresses?.[0]?.split(",")?.[0]?.trim()) || "Fatehpura";
+    const sports = item.sportsPlayed?.filter(Boolean) ?? [];
 
     return {
       playerId: String(item.customerId || item._id),
@@ -123,42 +127,12 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
       city,
       area: areaName,
       areas: [areaName, city].filter(Boolean),
-      completedBookings: item.completedBookings || 1,
+      sports,
+      completedBookings: item.completedBookings,
       rank: index + 1,
       lastBookingDate: item.lastCompletedBookingAt,
     };
   });
-
-  // Supplement with active registered customers if total booked players is small
-  if (items.length < limit) {
-    const existingIds = new Set(items.map((i) => i.playerId));
-    const registeredCustomers = await CustomerModel.find({ status: "active" })
-      .sort({ createdAt: -1 })
-      .limit(limit - items.length)
-      .lean();
-
-    for (const cust of registeredCustomers) {
-      const idStr = String(cust._id);
-      if (existingIds.has(idStr)) continue;
-      existingIds.add(idStr);
-
-      items.push({
-        playerId: idStr,
-        name: cust.name || "BYV Player",
-        username: cust.username ? (cust.username.startsWith("@") ? cust.username : `@${cust.username}`) : undefined,
-        profileImage: cust.avatarUrl || null,
-        city: cust.city || "Udaipur",
-        area: cust.area || "Fatehpura",
-        areas: [cust.area || "Fatehpura", "Udaipur"].filter(Boolean),
-        completedBookings: 1,
-        rank: items.length + 1,
-        lastBookingDate: cust.createdAt?.toISOString(),
-      });
-    }
-  }
-
-  // Re-rank 1..N
-  items = items.map((it, idx) => ({ ...it, rank: idx + 1 }));
 
   return { items, areas: areasList, count: items.length };
 }
