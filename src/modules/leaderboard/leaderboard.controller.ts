@@ -47,8 +47,8 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
 
   // Only count genuinely confirmed / completed & paid bookings
   const matchStage: any = {
-    status: { $in: ["Confirmed", "Completed"] },
-    paymentStatus: { $in: ["paid", "Cash (Offline)", "partial"] },
+    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
+    paymentStatus: "paid",
   };
 
   const pipeline: any[] = [
