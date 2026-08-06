@@ -71,7 +71,11 @@ export interface BookedRange {
  * first one's booking doesn't confirm until their payment gateway callback lands, and
  * until then it was invisible to everyone else's availability check. Short enough that
  * an abandoned checkout (closed tab, declined card) doesn't lock a slot for good. */
+<<<<<<< Updated upstream
+const PENDING_HOLD_MS = 60_000;
+=======
 const PENDING_HOLD_MS = 5 * 60_000;
+>>>>>>> Stashed changes
 
 /** Bookings that currently occupy a slot: confirmed ones permanently, plus any very
  * recent "Pending" one still inside its hold window (mid-checkout, payment not yet
@@ -186,7 +190,11 @@ function chooseCourts(
         const clash = overlapping.find((r) => (r.courtId || defaultCourtId) === court.id);
         throw ApiError.conflict(
           clash?.status === "Pending"
+<<<<<<< Updated upstream
+            ? `${court.name} is currently being booked by someone else. Please try again in a minute or pick another court.`
+=======
             ? `${court.name} is currently being booked by someone else. Please try again in a few minutes or pick another court.`
+>>>>>>> Stashed changes
             : `${court.name} is already booked for this time. Please pick another court or slot.`
         );
       }
@@ -298,7 +306,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       if (clash) {
         throw ApiError.conflict(
           clash.status === "Pending"
+<<<<<<< Updated upstream
+            ? `This time is currently being booked by someone else (${clash.startTime} - ${clash.endTime}). Please try again in a minute or pick a different slot.`
+=======
             ? `This time is currently being booked by someone else (${clash.startTime} - ${clash.endTime}). Please try again in a few minutes or pick a different slot.`
+>>>>>>> Stashed changes
             : `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
         );
       }
