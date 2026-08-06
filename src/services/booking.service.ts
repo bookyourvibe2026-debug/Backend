@@ -66,6 +66,26 @@ export interface BookedRange {
   courtId?: string;
 }
 
+/** How long a just-created ("Pending") booking holds its court before it stops blocking
+ * other customers. Without this, two players can pay for the same slot at once: the
+ * first one's booking doesn't confirm until their payment gateway callback lands, and
+ * until then it was invisible to everyone else's availability check. Short enough that
+ * an abandoned checkout (closed tab, declined card) doesn't lock a slot for good. */
+const PENDING_HOLD_MS = 5 * 60_000;
+
+/** Bookings that currently occupy a slot: confirmed ones permanently, plus any very
+ * recent "Pending" one still inside its hold window (mid-checkout, payment not yet
+ * confirmed). Older Pending rows are abandoned checkouts and are excluded so they don't
+ * block a slot forever. */
+function activeBookingStatusFilter() {
+  return {
+    $or: [
+      { status: { $in: ["Confirmed", "Part Paid", "Completed"] } },
+      { status: "Pending", createdAt: { $gte: new Date(Date.now() - PENDING_HOLD_MS) } },
+    ],
+  };
+}
+
 function toBookedRanges(bookings: { dateTime: Date; endTime?: string; status: string; courtId?: string; courtIds?: string[] }[]): BookedRange[] {
   // A booking spanning several courts takes each of them out separately, so it is
   // flattened into one range per court — callers then need no multi-court awareness.
@@ -88,8 +108,8 @@ export async function getBookedRangesForDate(listingId: string, date: string): P
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
   const bookings = await BookingModel.find({
     listingId,
-    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
     dateTime: { $gte: dayStart, $lt: dayEnd },
+    ...activeBookingStatusFilter(),
   })
     .select("dateTime endTime status courtId courtIds")
     .lean();
@@ -108,8 +128,8 @@ export async function getBookedRangesForDates(listingIds: string[], date: string
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60_000);
   const bookings = await BookingModel.find({
     listingId: { $in: listingIds },
-    status: { $in: ["Confirmed", "Part Paid", "Completed"] },
     dateTime: { $gte: dayStart, $lt: dayEnd },
+    ...activeBookingStatusFilter(),
   })
     .select("listingId dateTime endTime status courtId courtIds")
     .lean();
@@ -163,7 +183,12 @@ function chooseCourts(
         throw ApiError.badRequest(`${court.name} does not host ${sport}`);
       }
       if (takenIds.has(court.id)) {
-        throw ApiError.conflict(`${court.name} is already booked for this time. Please pick another court or slot.`);
+        const clash = overlapping.find((r) => (r.courtId || defaultCourtId) === court.id);
+        throw ApiError.conflict(
+          clash?.status === "Pending"
+            ? `${court.name} is currently being booked by someone else. Please try again in a few minutes or pick another court.`
+            : `${court.name} is already booked for this time. Please pick another court or slot.`
+        );
       }
       chosen.push(court);
     }
@@ -177,7 +202,7 @@ function chooseCourts(
     );
   }
   const free = candidates.find((c) => !takenIds.has(c.id));
-  if (!free) throw ApiError.conflict("All courts are booked for this time. Please pick a different slot.");
+  if (!free) throw ApiError.conflict("All courts are taken or being booked by someone else for this time. Please pick a different slot.");
   return [free];
 }
 
@@ -272,7 +297,9 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       const clash = overlapping[0];
       if (clash) {
         throw ApiError.conflict(
-          `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
+          clash.status === "Pending"
+            ? `This time is currently being booked by someone else (${clash.startTime} - ${clash.endTime}). Please try again in a few minutes or pick a different slot.`
+            : `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
         );
       }
     } else {

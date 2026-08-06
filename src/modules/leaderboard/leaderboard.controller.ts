@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { BookingModel } from "../../models/Booking.model";
-import { CustomerModel } from "../../models/Customer.model";
 import { ListingModel } from "../../models/Listing.model";
 import { cached } from "../../utils/cache";
 import { sendSuccess } from "../../utils/ApiResponse";
@@ -19,22 +18,75 @@ const DEFAULT_AREAS = [
   "Madri",
 ];
 
+interface RankedPlayerItem {
+  playerId: string;
+  name: string;
+  username?: string;
+  profileImage: string | null;
+  city: string;
+  area: string;
+  areas: string[];
+  sports: string[];
+  completedBookings: number;
+  rank: number;
+  lastBookingDate?: string;
+}
+
 export async function getTopPlayersLeaderboard(req: Request, res: Response): Promise<void> {
   try {
-    const area = typeof req.query.area === "string" && !req.query.area.toLowerCase().includes("all") ? req.query.area.trim() : undefined;
+    const area = parseAreaQuery(req);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
 
-    const cacheKey = `${LEADERBOARD_CACHE_PREFIX}${JSON.stringify({ area, limit })}`;
-    const payload = await cached(cacheKey, LEADERBOARD_CACHE_TTL_MS, () => computeLeaderboard(area, limit));
+    const [ranking, areasList] = await Promise.all([getCachedRanking(area), getCachedAreasList()]);
+    const items = ranking.slice(0, limit);
 
-    sendSuccess(res, 200, payload);
+    sendSuccess(res, 200, { items, areas: areasList, count: items.length });
   } catch (error: any) {
     console.error("[LeaderboardController] Error fetching player leaderboard:", error);
     res.status(500).json({ success: false, error: "Failed to load player leaderboard" });
   }
 }
 
-async function computeLeaderboard(area: string | undefined, limit: number) {
+/** The logged-in player's own rank — lets the UI show "You're #47" when they fall outside the visible top-N list. */
+export async function getMyPlayerRank(req: Request, res: Response): Promise<void> {
+  try {
+    const customerId = req.auth?.sub;
+    if (!customerId) {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+      return;
+    }
+
+    const area = parseAreaQuery(req);
+    const ranking = await getCachedRanking(area);
+    const mine = ranking.find((item) => item.playerId === String(customerId));
+
+    sendSuccess(res, 200, {
+      rank: mine?.rank ?? null,
+      completedBookings: mine?.completedBookings ?? 0,
+      totalPlayers: ranking.length,
+    });
+  } catch (error: any) {
+    console.error("[LeaderboardController] Error fetching player rank:", error);
+    res.status(500).json({ success: false, error: "Failed to load player rank" });
+  }
+}
+
+function parseAreaQuery(req: Request): string | undefined {
+  return typeof req.query.area === "string" && !req.query.area.toLowerCase().includes("all")
+    ? req.query.area.trim()
+    : undefined;
+}
+
+function getCachedRanking(area: string | undefined): Promise<RankedPlayerItem[]> {
+  const cacheKey = `${LEADERBOARD_CACHE_PREFIX}ranking:${JSON.stringify({ area })}`;
+  return cached(cacheKey, LEADERBOARD_CACHE_TTL_MS, () => computeFullRanking(area));
+}
+
+function getCachedAreasList(): Promise<string[]> {
+  return cached(`${LEADERBOARD_CACHE_PREFIX}areas`, LEADERBOARD_CACHE_TTL_MS, computeAreasList);
+}
+
+async function computeAreasList(): Promise<string[]> {
   // Fetch distinct listing areas to keep the frontend dropdown options accurate
   const dbAreas = await ListingModel.distinct("address");
   const parsedAreas = new Set<string>(["All areas", ...DEFAULT_AREAS]);
@@ -44,8 +96,11 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
       if (parts[0]) parsedAreas.add(parts[0]);
     }
   }
-  const areasList = Array.from(parsedAreas);
+  return Array.from(parsedAreas);
+}
 
+/** Full sorted ranking (no cap) so the top-N list and an individual player's rank always agree on the same ordering. */
+async function computeFullRanking(area: string | undefined): Promise<RankedPlayerItem[]> {
   // Only count genuinely confirmed / completed & paid bookings
   const matchStage: any = {
     status: { $in: ["Confirmed", "Part Paid", "Completed"] },
@@ -97,7 +152,6 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
         lastCompletedBookingAt: -1,
       },
     },
-    { $limit: limit },
     {
       $lookup: {
         from: "customers",
@@ -111,7 +165,7 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
 
   const bookingResults = await BookingModel.aggregate(pipeline);
 
-  const items = bookingResults.map((item, index) => {
+  return bookingResults.map((item, index) => {
     const c = item.customerDoc;
     const name = c?.name || item.customerName || "Anonymous Player";
     const username = c?.username ? (c.username.startsWith("@") ? c.username : `@${c.username}`) : undefined;
@@ -134,6 +188,4 @@ async function computeLeaderboard(area: string | undefined, limit: number) {
       lastBookingDate: item.lastCompletedBookingAt,
     };
   });
-
-  return { items, areas: areasList, count: items.length };
 }
