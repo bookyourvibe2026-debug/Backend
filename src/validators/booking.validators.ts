@@ -23,6 +23,8 @@ export const createBookingSchema = z.object({
   /** Several courts booked together for the same slot. Wins over `courtId` when non-empty. */
   courtIds: z.array(z.string().trim().max(60)).max(50).optional(),
   durationMinutes: z.coerce.number().int().positive().optional(),
+  /** Whether the player opted in to Play Protect (+₹19). */
+  playProtect: z.boolean().optional(),
 });
 
 export const orderIdParamSchema = z.object({
@@ -60,3 +62,6 @@ export const bookingListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(500).default(20),
 });
+
+
+

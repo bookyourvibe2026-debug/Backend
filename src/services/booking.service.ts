@@ -1,7 +1,7 @@
 import { FilterQuery } from "mongoose";
 import { env } from "../config/env";
 import { BookingDocument, BookingModel } from "../models/Booking.model";
-import { Court, ListingModel } from "../models/Listing.model";
+import { Court, ListingModel, TurfSlot } from "../models/Listing.model";
 import { ApiError } from "../utils/ApiError";
 import { generateOrderId } from "../utils/orderId";
 import { boostedPrice, clampBoostPct, findActiveBoostRule } from "./lastMinBoost.service";
@@ -34,6 +34,7 @@ export interface CreateBookingInput {
   email?: string;
   payment: "Cashfree (Online)" | "Cash (Offline)" | "UPI";
   paymentType?: "partial" | "full";
+  playProtect?: boolean;
   /** Court the customer picked. Omitted = auto-assign the first free court. */
   courtId?: string;
   /** Several courts taken in one booking. Takes precedence over `courtId` when non-empty. */
@@ -181,14 +182,44 @@ function chooseCourts(
 }
 
 /**
- * A court's hourly rate. The vendor prices a venue per time slot, and that rate is the
- * single source of truth — every court in an hour costs the same, so what the player was
- * quoted on the slot card is exactly what they are charged. Court-level rates are
- * deliberately not consulted: two prices for one hour is what made the slot card and the
- * court list disagree.
+ * The price for one time slot, resolved for a specific court and sport. A vendor can
+ * price a slot four ways in Package Studio's Slot-by-Slot Pricing — an exact
+ * sport+court override, a sport-only default (any court), a court-only default (any
+ * sport), or the venue's global default — and this picks the most specific one that
+ * exists, falling back down that same order. This is the single source of truth for
+ * "what does this slot actually cost for this booking": both createBooking below and
+ * booking-flow.tsx's own generatedSlots preview use this identical priority, so what a
+ * customer is quoted at checkout is exactly what they're charged.
  */
-export function courtHourlyRate(_court: Court | undefined, slotRate: number): number {
-  return slotRate;
+export function getSlotPriceForCourtAndSport(
+  slots: TurfSlot[],
+  startTime: string,
+  endTime: string,
+  courtId: string | undefined,
+  sport: string | undefined,
+  baseHourlyRate: number
+): number {
+  const candidates = slots.filter((s) => s.startTime === startTime && s.endTime === endTime);
+  if (candidates.length === 0) return baseHourlyRate;
+
+  const matchSport = sport?.toLowerCase();
+  let best = null;
+  if (matchSport && courtId) {
+    best = candidates.find(c => c.sport?.toLowerCase() === matchSport && c.courtId === courtId);
+  }
+  if (!best && matchSport) {
+    best = candidates.find(c => c.sport?.toLowerCase() === matchSport && !c.courtId);
+  }
+  if (!best && courtId) {
+    best = candidates.find(c => c.courtId === courtId && !c.sport);
+  }
+  if (!best) {
+    best = candidates.find(c => !c.sport && !c.courtId);
+  }
+  if (!best) {
+    best = candidates[0];
+  }
+  return best?.price ?? baseHourlyRate;
 }
 
 export function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
@@ -251,49 +282,61 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
 
     // Price is whatever slot(s) this booking actually overlaps, pro-rated by minutes
     // covered in each — never a flat whole-day average. A venue with a cheaper morning
-    // rate and a pricier evening rate (or any per-slot/dynamic pricing) must charge the
-    // rate for the time actually booked, and this must match what the customer was
-    // shown at checkout (booking-flow.tsx's own generatedSlots uses this same overlap-
-    // weighted hourly-rate method).
-    let baseHourlyRate = listing.price || 1000;
+    // rate and a pricier evening rate (or a sport/court-specific override set in Package
+    // Studio's Slot-by-Slot Pricing) must charge the rate for the time, sport and court
+    // actually booked, and this must match what the customer was shown at checkout
+    // (booking-flow.tsx's own generatedSlots preview uses this identical resolution).
+    const venueDefaultRate = listing.price || 1000;
+    const timeRanges: { startTime: string; endTime: string }[] = [];
     if (slots.length > 0) {
-      let coveredMin = 0;
-      let weightedSum = 0;
+      const seen = new Set<string>();
       for (const s of slots) {
-        const sStart = timeToMinutes(s.startTime);
-        let sEnd = timeToMinutes(s.endTime);
-        if (sEnd <= sStart) sEnd += 1440;
-        const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
-        if (overlap > 0) {
-          const slotHours = Math.max(1, (sEnd - sStart) / 60);
-          const hourlyRate = s.isClubSlot ? s.price / slotHours : s.price;
-          coveredMin += overlap;
-          weightedSum += overlap * hourlyRate;
+        const key = `${s.startTime}-${s.endTime}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          timeRanges.push({ startTime: s.startTime, endTime: s.endTime });
         }
-      }
-      if (coveredMin > 0) {
-        baseHourlyRate = Math.round(weightedSum / coveredMin);
-      } else {
-        // Nothing configured actually covers this window — fall back to the day's average.
-        const sum = slots.reduce((acc, s) => {
-          const sStart = timeToMinutes(s.startTime);
-          let sEnd = timeToMinutes(s.endTime);
-          if (sEnd <= sStart) sEnd += 1440;
-          const slotHours = Math.max(1, (sEnd - sStart) / 60);
-          return acc + (s.isClubSlot ? s.price / slotHours : s.price);
-        }, 0);
-        baseHourlyRate = Math.round(sum / slots.length);
       }
     }
 
-    // Every court costs the slot rate, so taking 2 courts for an hour costs it twice.
-    // This is the same arithmetic booking-flow.tsx shows at checkout.
-    if (selectedCourts.length > 0) {
-      const perHour = selectedCourts.reduce((sum, court) => sum + courtHourlyRate(court, baseHourlyRate), 0);
-      baseAmount = Math.round((durationMin / 60) * perHour);
-    } else {
-      baseAmount = Math.round((durationMin / 60) * baseHourlyRate);
-    }
+    /** Overlap-weighted hourly rate across [startMin, endMin) for one court (or the
+     * court-less venue as a whole, when courtId is undefined). */
+    const hourlyRateFor = (courtId: string | undefined): number => {
+      let coveredMin = 0;
+      let weightedSum = 0;
+      for (const range of timeRanges) {
+        const sStart = timeToMinutes(range.startTime);
+        let sEnd = timeToMinutes(range.endTime);
+        if (sEnd <= sStart) sEnd += 1440;
+        const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
+        if (overlap <= 0) continue;
+        const price = getSlotPriceForCourtAndSport(slots, range.startTime, range.endTime, courtId, input.sport, venueDefaultRate);
+        const slotHours = Math.max(1, (sEnd - sStart) / 60);
+        const isClub = slots.some((s) => s.startTime === range.startTime && s.endTime === range.endTime && s.isClubSlot);
+        const hourlyRate = isClub ? price / slotHours : price;
+        coveredMin += overlap;
+        weightedSum += overlap * hourlyRate;
+      }
+      if (coveredMin > 0) return Math.round(weightedSum / coveredMin);
+      if (slots.length === 0) return venueDefaultRate;
+      // Nothing configured actually covers this window — fall back to the day's average.
+      const sum = slots.reduce((acc, s) => {
+        const sStart = timeToMinutes(s.startTime);
+        let sEnd = timeToMinutes(s.endTime);
+        if (sEnd <= sStart) sEnd += 1440;
+        const slotHours = Math.max(1, (sEnd - sStart) / 60);
+        return acc + (s.isClubSlot ? s.price / slotHours : s.price);
+      }, 0);
+      return Math.round(sum / slots.length);
+    };
+
+    // Every court costs its own resolved rate, so taking 2 courts for an hour costs the
+    // sum of both — this is the same arithmetic booking-flow.tsx shows at checkout.
+    const perHour =
+      selectedCourts.length > 0
+        ? selectedCourts.reduce((sum, court) => sum + hourlyRateFor(court.id), 0)
+        : hourlyRateFor(undefined);
+    baseAmount = Math.round((durationMin / 60) * perHour);
 
     // Last Min Boost. Applied here, at the moment of booking, so the player is charged
     // exactly the discounted price the slot was advertised at — the deal is only live
@@ -345,6 +388,10 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       if (!addOn) throw ApiError.badRequest(`Invalid add-on selected: ${addOnId}`);
       baseAmount += addOn.price;
     }
+  }
+
+  if (input.playProtect) {
+    baseAmount += 19;
   }
 
   let discountPercent = 0;
@@ -420,6 +467,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     paymentStatus: "pending",
     status: "Pending",
     lastMinuteBoost: appliedBoost,
+    playProtect: input.playProtect ?? false,
   });
   invalidatePublicListingCache();
   return created;
@@ -622,3 +670,9 @@ export async function checkInBooking(orderId: string, vendorId: string) {
   await booking.save();
   return { booking, alreadyCheckedIn: false };
 }
+
+
+
+
+
+

@@ -93,6 +93,12 @@ export const createListingSchema = z.object({
         price: z.number().nonnegative(),
         blocked: z.boolean().optional(),
         blockedReason: z.string().max(200).optional(),
+        isClubSlot: z.boolean().optional(),
+        clubId: z.string().optional(),
+        slotIds: z.array(z.string()).optional(),
+        durationMinutes: z.number().optional(),
+        sport: z.string().optional(),
+        courtId: z.string().optional(),
       })
     )
     .optional(),
@@ -112,6 +118,12 @@ export const createListingSchema = z.object({
             label: z.string(),
             price: z.number().nonnegative(),
             blocked: z.boolean().optional(),
+            isClubSlot: z.boolean().optional(),
+            clubId: z.string().optional(),
+            slotIds: z.array(z.string()).optional(),
+            durationMinutes: z.number().optional(),
+            sport: z.string().optional(),
+            courtId: z.string().optional(),
           })
         ),
       })

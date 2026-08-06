@@ -28,6 +28,8 @@ export interface BookingDocument {
   numberOfPlayers?: number;
   /** Whether food & beverage is included with this booking. */
   foodIncluded?: boolean;
+  /** Whether the customer opted in to Play Protect (+₹19 cancellation & injury cover). */
+  playProtect?: boolean;
   dateTime: Date;
   endTime?: string;
   totalAmount: number;
@@ -73,6 +75,7 @@ const bookingSchema = new Schema<BookingDocument>(
     courtNames: { type: [String], default: undefined },
     numberOfPlayers: { type: Number, min: 1, max: 200 },
     foodIncluded: { type: Boolean },
+    playProtect: { type: Boolean, default: false },
     dateTime: { type: Date, required: true },
     /** Slot end as "HH:mm"; optional so existing bookings stay valid. */
     endTime: { type: String },
@@ -119,3 +122,4 @@ bookingSchema.index({ vendorId: 1, checkedIn: 1, checkedInAt: -1 });
 bookingSchema.index({ paymentStatus: 1, updatedAt: -1 });
 
 export const BookingModel = model<BookingDocument>("Booking", bookingSchema);
+

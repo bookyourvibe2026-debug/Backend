@@ -54,6 +54,8 @@ export interface TurfSlot {
   clubId?: string;
   slotIds?: string[];
   durationMinutes?: number;
+  sport?: string;
+  courtId?: string;
 }
 
 export interface DateOverride {
@@ -244,6 +246,8 @@ const turfSlotSchema = new Schema<TurfSlot>(
     clubId: { type: String },
     slotIds: { type: [String], default: [] },
     durationMinutes: { type: Number },
+    sport: { type: String },
+    courtId: { type: String },
   },
   { _id: false }
 );

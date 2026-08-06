@@ -6,7 +6,7 @@ import { BookingModel } from "../models/Booking.model";
 import { paymentProvider } from "./payment/payment.service";
 import { ApiError } from "../utils/ApiError";
 import { activeBoostPct, boostedPrice } from "./lastMinBoost.service";
-import { istTimeHHmm, timeToMinutes, computePricing, IST } from "./booking.service";
+import { istTimeHHmm, timeToMinutes, computePricing, IST, getSlotPriceForCourtAndSport } from "./booking.service";
 
 export interface CreateHostedMatchInput {
   listingId: string;
@@ -67,16 +67,27 @@ export async function createHostedMatch(
     const slots = listing.slotsList || [];
 
     if (slots.length > 0) {
+      const timeRanges: { startTime: string; endTime: string }[] = [];
+      const seen = new Set<string>();
+      for (const s of slots) {
+        const key = `${s.startTime}-${s.endTime}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          timeRanges.push({ startTime: s.startTime, endTime: s.endTime });
+        }
+      }
+
       let coveredMin = 0;
       let weightedSum = 0;
-      for (const s of slots) {
-        const sStart = timeToMinutes(s.startTime);
-        let sEnd = timeToMinutes(s.endTime);
+      for (const range of timeRanges) {
+        const sStart = timeToMinutes(range.startTime);
+        let sEnd = timeToMinutes(range.endTime);
         if (sEnd <= sStart) sEnd += 1440;
         const overlap = Math.min(endMin, sEnd) - Math.max(startMin, sStart);
         if (overlap > 0) {
+          const price = getSlotPriceForCourtAndSport(slots, range.startTime, range.endTime, input.courtId, input.sport, baseAmount);
           coveredMin += overlap;
-          weightedSum += overlap * s.price;
+          weightedSum += overlap * price;
         }
       }
       if (coveredMin > 0) {
