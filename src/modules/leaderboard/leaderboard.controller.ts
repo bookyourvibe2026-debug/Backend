@@ -189,3 +189,4 @@ async function computeFullRanking(area: string | undefined): Promise<RankedPlaye
     };
   });
 }
+
