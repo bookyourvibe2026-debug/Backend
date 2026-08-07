@@ -67,11 +67,8 @@ export interface BookedRange {
 }
 
 /** How long a just-created ("Pending") booking holds its court before it stops blocking
- * other customers. Without this, two players can pay for the same slot at once: the
- * first one's booking doesn't confirm until their payment gateway callback lands, and
- * until then it was invisible to everyone else's availability check. Short enough that
- * an abandoned checkout (closed tab, declined card) doesn't lock a slot for good. */
-const PENDING_HOLD_MS = 60_000;
+ * other customers. Without this, two players can pay for the same slot at once. */
+const PENDING_HOLD_MS = 120_000; // 2 minutes hold for checkout court reservation
 
 /** Bookings that currently occupy a slot: confirmed ones permanently, plus any very
  * recent "Pending" one still inside its hold window (mid-checkout, payment not yet
@@ -624,7 +621,14 @@ export async function listBookingsForCustomer(customerId: string, filters: { sta
 
 export async function listBookingsForVendor(vendorId: string, filters: { status?: string; page: number; limit: number }) {
   const filter: FilterQuery<BookingDocument> = { vendorId };
-  if (filters.status) filter.status = filters.status;
+  if (filters.status) {
+    filter.status = filters.status;
+  } else {
+    filter.$or = [
+      { status: { $in: ["Confirmed", "Part Paid", "Completed"] } },
+      { status: "Pending", createdAt: { $gte: new Date(Date.now() - PENDING_HOLD_MS) } },
+    ];
+  }
   return paginate(filter, filters);
 }
 
