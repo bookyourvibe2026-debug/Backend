@@ -14,6 +14,22 @@ const PURPOSE_LABELS: Record<OtpPurpose, string> = {
   vendor_mpin_change: "change your MPIN",
 };
 
+const PURPOSE_SUBJECTS: Record<OtpPurpose, string> = {
+  customer_login: "Your Book Your Vibe Sign In Code",
+  customer_reset: "Reset Your Book Your Vibe Password",
+  vendor_reset: "Reset Your Book Your Vibe Password",
+  vendor_register: "Verify Your Book Your Vibe Account",
+  vendor_mpin_change: "Book Your Vibe MPIN Verification Code",
+};
+
+const PURPOSE_TITLES: Record<OtpPurpose, string> = {
+  customer_login: "Account Sign In",
+  customer_reset: "Password Reset Request",
+  vendor_reset: "Password Reset Request",
+  vendor_register: "Email Verification",
+  vendor_mpin_change: "MPIN Change Request",
+};
+
 export async function requestOtp(email: string, purpose: OtpPurpose): Promise<void> {
   const normalizedEmail = email.toLowerCase().trim();
   const code = generateOtp();
@@ -42,11 +58,15 @@ export async function requestOtp(email: string, purpose: OtpPurpose): Promise<vo
     throw ApiError.serviceUnavailable("Email service isn't configured on the server — the verification code could not be sent.");
   }
 
+  const subject = PURPOSE_SUBJECTS[purpose] ?? "Your Book Your Vibe verification code";
+  const title = PURPOSE_TITLES[purpose] ?? "Book Your Vibe";
+  const label = PURPOSE_LABELS[purpose] ?? "verify your action";
+
   await sendMail({
     to: normalizedEmail,
-    subject: "Your Book Your Vibe verification code",
-    html: otpEmailHtml(code, PURPOSE_LABELS[purpose]),
-    text: otpEmailText(code, PURPOSE_LABELS[purpose]),
+    subject,
+    html: otpEmailHtml(code, label, title),
+    text: otpEmailText(code, label, title),
   });
 }
 

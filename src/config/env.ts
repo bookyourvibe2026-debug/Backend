@@ -37,6 +37,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().default("Book Your Vibe <no-reply@bookyourvibe.in>"),
+  MAIL_REPLY_TO: z.string().default("Book Your Vibe Support <support@bookyourvibe.in>"),
 
   RESEND_API_KEY: z.string().optional(),
 
