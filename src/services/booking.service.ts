@@ -183,7 +183,7 @@ function chooseCourts(
         const clash = overlapping.find((r) => (r.courtId || defaultCourtId) === court.id);
         throw ApiError.conflict(
           clash?.status === "Pending"
-            ? `${court.name} is currently being booked by someone else. Please try again in a minute or pick another court.`
+            ? `${court.name} is currently being booked by someone else. Please try again in a couple of minutes or pick another court.`
             : `${court.name} is already booked for this time. Please pick another court or slot.`
         );
       }
@@ -295,7 +295,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       if (clash) {
         throw ApiError.conflict(
           clash.status === "Pending"
-            ? `This time is currently being booked by someone else (${clash.startTime} - ${clash.endTime}). Please try again in a minute or pick a different slot.`
+            ? `This time is currently being booked by someone else (${clash.startTime} - ${clash.endTime}). Please try again in a couple of minutes or pick a different slot.`
             : `This time overlaps an existing booking (${clash.startTime} - ${clash.endTime}). Please pick a different slot.`
         );
       }
