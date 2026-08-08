@@ -25,6 +25,70 @@ export interface ListingQuery {
   limit: number;
 }
 
+export function isEventExpired(listing: Partial<ListingDocument>, now: Date = new Date()): boolean {
+  if (listing.type !== "Event") return false;
+
+  const validOverrides = (listing.dateOverrides ?? []).filter(
+    (o) => !o.isHoliday && (o.slots ?? []).length > 0
+  );
+
+  let latestEndTime: Date | null = null;
+
+  if (validOverrides.length > 0) {
+    for (const override of validOverrides) {
+      if (!override.date) continue;
+      const dateOnly = override.date.slice(0, 10);
+
+      for (const slot of override.slots ?? []) {
+        const slotEnd = slot.endTime || slot.startTime || "23:59";
+        const [hStr, mStr] = slotEnd.split(":");
+        const hours = parseInt(hStr || "23", 10);
+        const mins = parseInt(mStr || "59", 10);
+
+        const slotEndDate = new Date(`${dateOnly}T00:00:00`);
+        if (isNaN(slotEndDate.getTime())) continue;
+
+        slotEndDate.setHours(hours, mins, 0, 0);
+
+        const [startHStr] = (slot.startTime || "00:00").split(":");
+        const startHours = parseInt(startHStr || "0", 10);
+        if (hours < startHours) {
+          slotEndDate.setDate(slotEndDate.getDate() + 1);
+        }
+
+        if (!latestEndTime || slotEndDate.getTime() > latestEndTime.getTime()) {
+          latestEndTime = slotEndDate;
+        }
+      }
+    }
+  }
+
+  if (!latestEndTime && listing.availableTill) {
+    const tillDate = new Date(listing.availableTill);
+    if (!isNaN(tillDate.getTime())) {
+      if (listing.reportingEndTime) {
+        const [hStr, mStr] = listing.reportingEndTime.split(":");
+        tillDate.setHours(parseInt(hStr || "23", 10), parseInt(mStr || "59", 10), 59, 999);
+      } else {
+        tillDate.setHours(23, 59, 59, 999);
+      }
+      latestEndTime = tillDate;
+    }
+  }
+
+  if (!latestEndTime && listing.availableFrom) {
+    const fromDate = new Date(listing.availableFrom);
+    if (!isNaN(fromDate.getTime())) {
+      fromDate.setHours(23, 59, 59, 999);
+      latestEndTime = fromDate;
+    }
+  }
+
+  if (!latestEndTime) return false;
+
+  return latestEndTime.getTime() < now.getTime();
+}
+
 export async function findPublicListings(query: ListingQuery) {
   const cacheKey = `${PUBLIC_CACHE_PREFIX}list:${JSON.stringify({
     city: query.city ?? "",
@@ -46,11 +110,13 @@ export async function findPublicListings(query: ListingQuery) {
     if (query.vendorId) filter.vendorId = query.vendorId;
     if (query.search) filter.$text = { $search: query.search };
 
+    const allItems = await ListingModel.find(filter).sort({ trending: -1, createdAt: -1 }).lean();
+    const now = new Date();
+    const activeItems = allItems.filter((item) => !isEventExpired(item, now));
+    const total = activeItems.length;
+
     const skip = (query.page - 1) * query.limit;
-    const [items, total] = await Promise.all([
-      ListingModel.find(filter).sort({ trending: -1, createdAt: -1 }).skip(skip).limit(query.limit).lean(),
-      ListingModel.countDocuments(filter),
-    ]);
+    const items = activeItems.slice(skip, skip + query.limit);
 
     return { items, total, page: query.page, limit: query.limit, pages: Math.ceil(total / query.limit) };
   });
@@ -220,10 +286,11 @@ export async function createListingForAdmin(data: Partial<ListingDocument>) {
 export async function listVendorListings(vendorId: string, query: Partial<ListingQuery>) {
   const filter: FilterQuery<ListingDocument> = { vendorId };
   if (query.type) filter.type = query.type;
+  if (query.category && query.category !== "all") {
+    const catRegex = new RegExp(`^${escapeRegex(query.category).replace(/-/g, "[\\s-]?")}$`, "i");
+    filter.categories = { $in: [catRegex, new RegExp(escapeRegex(query.category), "i")] };
+  }
   if (query.search) filter.$text = { $search: query.search };
-  // No field projection here — several vendor-panel consumers (boost/pricing sheets,
-  // clone) read the full document, not just table-summary fields. .lean() alone still
-  // avoids Mongoose document hydration cost without changing what's available.
   return ListingModel.find(filter).sort({ createdAt: -1 }).lean();
 }
 

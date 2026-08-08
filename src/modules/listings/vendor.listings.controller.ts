@@ -16,7 +16,7 @@ export const createVendorListing = asyncHandler(async (req: Request, res: Respon
 });
 
 export const getVendorListings = asyncHandler(async (req: Request, res: Response) => {
-  const listings = await listVendorListings(req.vendorId!, req.query as { type?: string; search?: string });
+  const listings = await listVendorListings(req.vendorId!, req.query as { type?: string; search?: string; category?: string });
   sendSuccess(res, 200, listings);
 });
 
